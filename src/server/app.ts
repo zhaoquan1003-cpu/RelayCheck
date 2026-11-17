@@ -85,14 +85,15 @@ export async function createApp(config: AppConfig): Promise<AppBundle> {
 
   await app.register(rateLimit, {
     global: false,
-    errorResponseBuilder: (_request, context) => ({
-      statusCode: context.statusCode,
-      ok: false,
-      error: {
-        code: 'RATE_LIMITED',
-        message: '请求过于频繁，请稍后再试',
-      },
-    }),
+    errorResponseBuilder: (_request, context) => {
+      const error = new Error('请求过于频繁，请稍后再试') as Error & {
+        statusCode: number
+        code: string
+      }
+      error.statusCode = context.statusCode
+      error.code = 'RATE_LIMITED'
+      return error
+    },
   })
 
   app.addHook('onSend', async (request, reply, payload) => {

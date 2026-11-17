@@ -243,6 +243,7 @@ describe('RelayCheck API integration', () => {
       })
       expect(second.status).toBe(429)
       expect(second.json.ok).toBe(false)
+      expect(second.json.error.code).toBe('RATE_LIMITED')
     } finally {
       await limited.close()
     }
