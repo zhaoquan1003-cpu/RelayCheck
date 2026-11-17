@@ -8,8 +8,8 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "dev": "concurrently -k -n server,web -c cyan,magenta \"tsx watch src/server/index.ts\" \"vite --port 5173\"",
-    "dev:server": "tsx watch src/server/index.ts",
+    "dev": "concurrently -k -n server,web -c cyan,magenta \"node --watch --import tsx src/server/index.ts\" \"vite --port 5173\"",
+    "dev:server": "node --watch --import tsx src/server/index.ts",
     "dev:web": "vite --port 5173",
     "build:web": "vite build",
     "build:server": "tsup",

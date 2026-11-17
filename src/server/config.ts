@@ -61,7 +61,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
 
 export function loadModelTiers(file: string): Record<string, number> {
   if (!existsSync(file)) return {}
-  const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+  const raw = JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) as Record<string, unknown>
   const output: Record<string, number> = {}
   for (const [key, value] of Object.entries(raw)) {
     if (typeof value === 'number' && Number.isFinite(value)) {

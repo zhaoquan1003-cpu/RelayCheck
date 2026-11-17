@@ -69,11 +69,11 @@ const html = `<!doctype html>
 
 const output = resolve(process.cwd(), 'public', 'questions', 'candy-strict.v1.png')
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
-const browser = await chromium.launch({
-  headless: true,
-  executablePath: existsSync(edge) ? edge : undefined,
-  channel: existsSync(edge) ? undefined : 'msedge',
-})
+const browser = await chromium.launch(
+  existsSync(edge)
+    ? { headless: true, executablePath: edge }
+    : { headless: true },
+)
 try {
   const page = await browser.newPage({ viewport: { width: 880, height: 1200 }, deviceScaleFactor: 2 })
   await page.setContent(html, { waitUntil: 'load' })

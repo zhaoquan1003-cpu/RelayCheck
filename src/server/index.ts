@@ -26,6 +26,7 @@ process.once('SIGTERM', () => void close('SIGTERM'))
 
 try {
   await app.listen({ host: config.HOST, port: config.PORT })
+  console.log(`[relaycheck] listening on http://${config.HOST}:${config.PORT}`)
 } catch (error) {
   app.log.error(error)
   process.exit(1)

@@ -108,16 +108,18 @@ async function refreshAll() {
   await loadList()
 }
 
-function switchTab(next: 'all' | 'mine') {
+async function switchTab(next: 'all' | 'mine') {
   if (tab.value === next) return
   tab.value = next
   page.value = 1
+  while (loading.value) await new Promise((resolve) => setTimeout(resolve, 50))
   void loadList()
 }
 
-function changePage(next: number) {
+async function changePage(next: number) {
   if (next < 1 || next > pageCount.value) return
   page.value = next
+  while (loading.value) await new Promise((resolve) => setTimeout(resolve, 50))
   void loadList()
 }
 

@@ -204,7 +204,7 @@ function probeLabel(kind: string) {
     </div>
     <div v-else class="dialog-card dialog-loading">
       <div class="spinner" />
-      <p>正在加载测试详情…</p>
+      <p>{{ error || '正在加载测试详情…' }}</p>
       <button class="secondary" type="button" @click="close">关闭</button>
     </div>
   </dialog>

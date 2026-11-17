@@ -284,6 +284,18 @@ export class TestJobRunner {
               signal: controller.signal,
               dispatcher: this.dispatcher,
             })
+          } catch (error) {
+            const now = Date.now()
+            output = {
+              status: 'failed',
+              answer: '',
+              error: sanitizeError(error, job.apiKey),
+              statusCode: null,
+              startedAt: now,
+              finishedAt: now,
+              durationMs: 0,
+              firstTokenMs: null,
+            }
           } finally {
             release()
           }
