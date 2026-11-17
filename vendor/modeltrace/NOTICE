@@ -1,0 +1,17 @@
+ModelTrace
+==========
+
+This project vendors the following MIT-licensed files from
+https://github.com/xqy2006/ModelTrace at commit
+6cd4a8ff0f3f4e49d6d6969dd2fbadfa1569fde2:
+
+  - static/fingerprint-core.js
+  - static/challenge-browser.js
+  - data/unified_bank.json
+
+Copyright (c) 2026 xqy2006.  See vendor/modeltrace/LICENSE for the full MIT
+license text.
+
+The fingerprint bank and challenge generator are used as-is so that scores
+remain comparable with ModelTrace.  The surrounding RelayCheck application is
+an independent implementation and is not endorsed by the ModelTrace authors.

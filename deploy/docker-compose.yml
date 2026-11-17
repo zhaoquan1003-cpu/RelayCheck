@@ -1,0 +1,76 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: relaycheck-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DATA_DIR: /data
+      TRUST_PROXY: "true"
+      APP_NAME: ${APP_NAME:-RelayCheck}
+      APP_TAGLINE: ${APP_TAGLINE:-模型测智站}
+      DEFAULT_UPSTREAM_URL: ${DEFAULT_UPSTREAM_URL:-}
+      TEST_TIMEOUT_MS: ${TEST_TIMEOUT_MS:-300000}
+      MAX_ANSWER_BYTES: ${MAX_ANSWER_BYTES:-2097152}
+      MAX_ACTIVE_JOBS: ${MAX_ACTIVE_JOBS:-4}
+      MAX_QUEUE: ${MAX_QUEUE:-20}
+      UPSTREAM_MAX_CONCURRENCY: ${UPSTREAM_MAX_CONCURRENCY:-8}
+      CREATE_PER_IP_PER_HOUR: ${CREATE_PER_IP_PER_HOUR:-6}
+      ACTIVE_PER_IP: ${ACTIVE_PER_IP:-2}
+      LIST_PER_MINUTE: ${LIST_PER_MINUTE:-120}
+      SSE_MAX_PER_IP: ${SSE_MAX_PER_IP:-3}
+      PUBLIC_LIST_ENABLED: ${PUBLIC_LIST_ENABLED:-true}
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
+      MAX_RECORDS: ${MAX_RECORDS:-500}
+      ALLOW_PRIVATE_UPSTREAMS: "false"
+      ADMIN_TOKEN_HASH: ${ADMIN_TOKEN_HASH:-}
+      MODEL_TIERS_FILE: /app/config/model-tiers.json
+    volumes:
+      - relaycheck-data:/data
+    expose:
+      - "3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - relaycheck
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: relaycheck-caddy
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - relaycheck
+
+volumes:
+  relaycheck-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  relaycheck:

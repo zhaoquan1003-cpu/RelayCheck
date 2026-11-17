@@ -1,0 +1,16 @@
+node_modules
+dist
+data
+.prod-smoke
+.env
+.env.local
+test-results
+playwright-report
+coverage
+.git
+.gitignore
+*.db
+*.db-shm
+*.db-wal
+tests
+docs/screenshots

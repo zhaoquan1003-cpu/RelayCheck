@@ -1,0 +1,20 @@
+{
+  "gpt-6-astra": 100,
+  "gpt-6-sol": 90,
+  "gpt-6-luna": 80,
+  "gpt-5.6-sol": 70,
+  "gpt-5.6-terra": 65,
+  "gpt-5.6-luna": 60,
+  "gpt-5.5": 50,
+  "gpt-5.4": 40,
+  "claude-opus-5-5": 95,
+  "claude-sonnet-5-5": 85,
+  "claude-opus-5": 75,
+  "claude-sonnet-5": 65,
+  "claude-opus-4-8": 60,
+  "claude-opus-4-7": 55,
+  "claude-opus-4-6": 50,
+  "claude-sonnet-4-6": 40,
+  "claude-haiku-4-5-20251001": 20,
+  "claude-haiku-5-5": 30
+}
