@@ -237,7 +237,7 @@ export class TestJobRunner {
       this.active.set(job.id, job)
       this.activeByIp.set(job.ip, ipActive + 1)
       void this.run(job).catch((error) => {
-        this.log.error({ err: error, testId: job.id }, 'unhandled job error')
+        this.log.error({ testId: job.id, message: sanitizeError(error, job.apiKey) }, 'unhandled job error')
       })
     }
   }
