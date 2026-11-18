@@ -1,6 +1,12 @@
 {
   "name": "relay-check",
   "version": "0.1.0",
+  "description": "Self-hosted OpenAI-compatible relay testing with reasoning, vision, animation, and model fingerprints.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhaoquan1003-cpu/RelayCheck.git"
+  },
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.28.5",

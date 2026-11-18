@@ -1,54 +1,50 @@
-# RelayCheck · 模型测智站
+<div align="center">
+  <img src="docs/assets/logo.svg" alt="RelayCheck Logo" width="144" height="144" />
+  <h1>RelayCheck</h1>
+  <p><strong>模型测智站 · 让每次检测，都有据可循。</strong></p>
+  <p>面向 OpenAI 兼容中转的推理、视觉与模型指纹检测工具</p>
+  <p>
+    <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-24%2B-417E38?style=flat-square&amp;logo=nodedotjs&amp;logoColor=white" alt="Node.js 24+" /></a>
+    <a href="https://vuejs.org/"><img src="https://img.shields.io/badge/Vue-3-42B883?style=flat-square&amp;logo=vuedotjs&amp;logoColor=white" alt="Vue 3" /></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 5" /></a>
+    <a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/SQLite-WAL-003B57?style=flat-square&amp;logo=sqlite&amp;logoColor=white" alt="SQLite WAL" /></a>
+    <a href="docs/DEPLOY.md"><img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&amp;logo=docker&amp;logoColor=white" alt="Docker Compose" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8B5CF6?style=flat-square" alt="MIT License" /></a>
+  </p>
+  <p>
+    <a href="#社区交流"><img src="https://img.shields.io/badge/QQ%20Group-536776109-12B7F5?style=flat-square&amp;logo=qq&amp;logoColor=white" alt="QQ 群 536776109" /></a>
+  </p>
+  <p>
+    <a href="#快速开始">快速开始</a> ·
+    <a href="#界面预览">界面预览</a> ·
+    <a href="#检测方式">检测方式</a> ·
+    <a href="docs/DEPLOY.md">部署文档</a> ·
+    <a href="docs/API.md">API 文档</a> ·
+    <a href="#社区交流">社区交流</a>
+  </p>
+  <p><sub>六种检测方式 · 服务端后台执行 · 结果可追溯 · 自托管部署</sub></p>
+</div>
 
-一个可自托管的 OpenAI 兼容中转检测站，通过推理题、图片题、动画生成和模型指纹，辅助检查中转的回答表现与模型路由是否符合预期。测试在服务端后台执行，结果自动保存并支持链接分享；默认保留 30 天、最多 500 条已结束记录，可按需调整或备份。
+---
 
-支持 **Responses / Chat Completions**，采用 **Vue 3 + TypeScript + Fastify + SQLite**，提供桌面与手机自适应界面。
+RelayCheck 帮助你检查 AI 中转的回答表现与模型路由是否符合预期。填入中转地址、API Key 和模型 ID，即可运行检测、查看完整证据并分享结果。支持 **Responses** 与 **Chat Completions**，无需登录。
 
-[GitHub 仓库](https://github.com/zhaoquan1003-cpu/RelayCheck) · [API 文档](docs/API.md) · [部署与备份](docs/DEPLOY.md) · [安全模型](docs/THREAT_MODEL.md)
+> 检测结果是辅助判断的依据，不是模型身份或能力证明。请求失败会单独记录，画图题由用户人工判读。
 
-![RelayCheck 首页](docs/screenshots/home.png)
+## 项目特性
 
-截图来自本地模拟测试环境；图中的地址、模型回答和检测限额用于演示，实际默认配置见下文。
-
-## 功能
-
-- **六种测试模式**
-  - `quick`：文字版糖果题，检查回答中的独立数字 `21`
-  - `strict`：只发糖果题原图，检查视觉通路是否被隐藏/替换
-  - `dual`：文字题与图片题并发；严格项优先，旧题过而严格题不过判为“掺水/残血”
-  - `cup`：水杯相邻交换题，检查独立数字 `8`（不校验证明）
-  - `pelican`：使用固定原题生成鹈鹕骑自行车的 HTML + SVG 动画，按四项结构人工对照判读
-  - `advanced`：3 条 ModelTrace 长数字题，做闭集模型指纹归因
-- **模型预设**：GPT / Claude 示例，以及 DeepSeek、GLM、Kimi 等国产模型；中转命名不一致时选“自定义模型”填实际 ID。
-- **接口与推理强度**：支持 Responses、Chat Completions，以及 `none` / `minimal` / `low` / `medium` / `high` / `xhigh`；需与上游实际支持的参数一致。
-- **后台任务**：关闭/刷新页面不中断；默认单测试 300 秒超时、每个子请求 2 MB 回答上限、失败留证。
-- **实时与回退**：详情 SSE + 3 秒列表轮询 + 1.5 秒快照回退。
-- **公开记录**：按页公开，详情含完整问题、回答、probes、错误和指纹；支持 `?id=` 分享。
-- **我的测试**：当前浏览器 `localStorage` 保存最近 100 个记录 ID，无需登录；问题、回答与结果保存在服务端。
-- **画图预览**：HTML + SVG 动画支持停止、重新播放和查看回答源码，附四项人工对照说明与四档自绘参考示意。
-- **隐私设计**：原始 Key/地址只在任务内存中存在，数据库和公开 API 只保存脱敏值。
-- **安全**：SSRF 校验、禁止重定向、端口限制、限流、并发上限、CSP、错误脱敏；画图 HTML 在沙箱中运行，旧 SVG 以隔离图片方式渲染。
-- **可部署**：Node 24 + Fastify + SQLite；Docker 多阶段构建 + Caddy（或自带 nginx 示例）。
-
-![测试详情](docs/screenshots/detail.png)
-
-## 页面使用
-
-1. 选择检测方式，默认是“糖果题（双测）”；严格原图与双测需要目标模型支持图片输入。
-2. 选择接口类型、模型和思考强度，默认使用 `responses`、`gpt-6-astra`、`low`。预设是模型 ID 示例，实际可用性由中转决定。
-3. 填入中转地址与 API Key，可展开题目预览后提交。任务进入后台执行，提交成功后输入框会清空 Key。
-4. 在详情中查看完整回答、子测试、错误和 ModelTrace 指纹，或复制分享链接。画图题需要结合动画与四项结构说明人工判读。
-5. 从“全部”或“我的”查看历史记录；清除浏览器数据会丢失“我的”记录索引，服务端记录仍按保留策略清理。
-
-首页侧栏提供标注为“不降智中转”的 [aloneapi.top](https://aloneapi.top/) 外部入口，在新标签页打开。
-
-![画图检测：动画预览与人工判读](docs/screenshots/drawing-ui/drawing-preview-1440.png)
-
-上图使用本地模拟上游的演示动画，展示预览与判读界面。
+| 能力 | 说明 |
+| --- | --- |
+| **多维度检测** | 糖果文字题、严格原图、双测、水杯题、鹈鹕动画和 ModelTrace 指纹，共六种模式。 |
+| **后台持续执行** | 关闭或刷新页面不中断任务；默认 300 秒超时，详情通过 SSE 更新并支持快照回退。 |
+| **完整结果留存** | 保存问题、回答、子测试、错误和指纹，支持 Markdown、数学公式及 `?id=` 分享。 |
+| **动画与人工对照** | HTML + SVG 沙箱预览，支持停止、重播及源码查看，附四项判读指南与参考示意。 |
+| **隐私与访问防护** | Key 和中转地址脱敏存储，提供 SSRF 校验、限流、并发控制及隔离渲染。 |
+| **轻量自托管** | Vue 3 + TypeScript + Fastify + SQLite，支持 Docker Compose / Caddy，适配桌面和手机。 |
 
 ## 快速开始
 
-要求 **Node.js 24+**，建议使用项目锁定的 **pnpm 11.28.5**。
+要求 **Node.js 24+**，建议使用项目锁定的 **pnpm 11.28.5**。已有 `.env` 时请保留现有配置。
 
 ```bash
 git clone https://github.com/zhaoquan1003-cpu/RelayCheck.git
@@ -58,257 +54,205 @@ cp .env.example .env
 pnpm dev
 ```
 
-Windows PowerShell 可将复制命令替换为 `Copy-Item .env.example .env`。已有本地配置时，保留现有 `.env`。
+Windows PowerShell 可用 `Copy-Item .env.example .env` 复制配置。开发环境前端为 <http://127.0.0.1:5173>，API 为 <http://127.0.0.1:3000>。
 
-- 前端：<http://127.0.0.1:5173>
-- API：<http://127.0.0.1:3000>
-- 生产构建并启动：
+**生产构建并启动：**
 
 ```bash
 pnpm build
 pnpm start
 ```
 
-`pnpm start` 自动启用生产模式并读取 `.env`。直接运行 `node dist/server/index.js` 时，应在环境中设置 `NODE_ENV=production`。
+`pnpm start` 自动启用生产模式并读取 `.env`，由 Fastify 托管前端和 API。直接运行 `node dist/server/index.js` 时，需要显式设置 `NODE_ENV=production`。
 
-本地完整验收：`pnpm check`（类型检查、单元/集成测试、生产构建、浏览器测试、生产冒烟）。依赖安全检查：`pnpm audit --prod`。
+### Docker Compose
 
-升级旧配置时，将 `TRUST_PROXY=true` 改为直连时的 `false`；只经过一个受控反向代理时使用 `1`，且禁止外部直接访问后端端口。生产模式会拒绝私网上游开关、无效布尔值和错误的管理员令牌摘要。
-
-`pnpm dev` 同时启动 Vite 与 Fastify；生产由 Fastify 直接服务 `dist/client`。
-
-### 生成 admin token（可选）
+复制并编辑 `.env.example` 为 `.env`，将 `SITE_ADDRESS` 设置为已解析到服务器的域名，再执行：
 
 ```bash
-# 生成随机 token 并保存好；只把 SHA-256 摘要写入 .env
-node -e "const c=require('node:crypto');const t=c.randomBytes(32).toString('hex');console.log('Token: '+t);console.log('ADMIN_TOKEN_HASH='+c.createHash('sha256').update(t).digest('hex'))"
+docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
 ```
 
-保存输出中的 `Token`，只将摘要填入 `.env` 的 `ADMIN_TOKEN_HASH`，然后用 `Authorization: Bearer <Token>` 访问：
+Caddy 自动管理 HTTPS；数据库保存于命名卷。本地 HTTP 预览可设 `SITE_ADDRESS=http://localhost`。完整代理、备份、升级及 systemd 配置见 [部署文档](docs/DEPLOY.md)。
 
-- `GET /api/v1/admin/stats`
-- `GET /api/v1/admin/tests?page=1`
-- `DELETE /api/v1/admin/tests/:id`
+## 界面预览
 
-未配置时 admin 路由为 404。
+截图来自本地模拟测试环境；其中的地址、回答与限额用于演示。
 
-## 架构
+<p align="center">
+  <img src="docs/screenshots/overview.png" alt="RelayCheck 桌面界面" width="960" />
+</p>
 
-```text
-浏览器 ── HTTPS ──► Caddy / nginx
-                       ├─ /             Fastify 托管 Vue 构建产物
-                       └─ /api/v1/...   JSON API + SSE
-                                            │
-                                            ├─ SQLite（tests / probes，WAL）
-                                            ├─ 内存队列 + worker
-                                            ├─ SSE hub
-                                            └─ undici → 目标中转
-                                                         Responses / Chat
-```
+<details>
+<summary><strong>查看完整首页与最新侧栏入口</strong></summary>
 
-- 单进程、单实例；SQLite 足够支撑公开小站。
-- 任务只存在内存队列 + 数据库状态；正常关闭会取消排队与运行中的请求并保存失败状态，异常退出后的未完成任务在重启时标为失败（因为 Key 不会被持久化）。
-- SSRF 防护在 DNS 解析和连接 lookup 两处校验；只允许 http/https 和 80/443，且拒绝私网/保留地址。
-- `ALLOW_PRIVATE_UPSTREAMS=true` 仅供测试使用，生产不要开启。
+![RelayCheck 完整首页](docs/screenshots/home.png)
 
-## 测试与判定
+</details>
 
-| 模式 | 发送 | 自动判定 |
-|---|---|---|
-| quick | 糖果文字题 | 独立数字 `21` → pass |
-| strict | 仅糖果题图片 | 独立数字 `21` → pass |
-| dual | quick + strict 并发 | 任一请求 failed → 无法判定；strict 通过 → pass；否则 quick 通过 → watered；否则 fail |
-| cup | 水杯题 | 独立数字 `8` → pass（不校验证明） |
-| pelican | 固定原题：创建包含鹈鹕骑自行车 SVG 2D 动画的 HTML | 请求成功 → unknown（待人工判读）；格式缺失、截断、超过 512 KiB 分别提示，不自动推断降智 |
-| advanced | 3 条 ModelTrace 数字题 | 任一请求失败 → failed；有效指纹回答不足 3 条 → unknown；完整指纹匹配模型 ID 或预测等级不低于目标 → pass；预测等级低于目标 → fail；等级缺失 → unknown |
+<details>
+<summary><strong>查看测试详情与动画判读界面</strong></summary>
 
-“独立数字”用 Unicode 边界判断，`210`、`21.5` 不会误算成 `21`。
+![测试详情](docs/screenshots/detail.png)
 
-画图题逐字采用 [GetPlus 的固定原题](https://www.getplus.ai/codex/gpt6-astra-jiangzhi)，不附加结构提示。HTML 的 CSS 和 JavaScript 在独立预览路由与不具同源权限的 iframe 沙箱中运行；预览禁用外部资源、接口请求、弹窗及顶层跳转，关闭详情会卸载动画。独立 SVG 则继续经 DOMPurify 清洗后以 `data:` 图片展示。格式识别不等于画面质量检查，四项（车轮、腿与脚踏、视角、鹈鹕喙）由用户结合动画判读；四档自绘示意是教学参考，不是模型实测。一次生成不能证明模型降智。
+![动画预览与人工判读](docs/screenshots/drawing-ui/drawing-preview-1440.png)
 
-当前题目版本为 `2026-11-v3`（更新画图题，原记录保留自己的题目）。糖果题/水杯题措辞仍与公开基准原题逐字一致：原题只要求“在活动前决定摸出的糖果数目”，不额外解释可以自行分配两种形状的数量。若在题面或严格模式图片里补上这类提示，会把外部判定为“降智”的中转误判成“不降智”。严格模式图片为本站自绘，但文字内容与原题一致。
+动画截图使用本地模拟上游的演示内容。
 
-> 这些判定是启发式的路由一致性检查，不是完整能力评测。请结合完整回答、上游账单和人工核验。
+</details>
 
-## API
+## 使用流程
 
-详见 [docs/API.md](docs/API.md)。核心端点：
+1. **选择检测方式**：默认是糖果题“双测”；严格原图与双测需要模型支持图片输入。
+2. **填写连接参数**：选择接口、模型和思考强度，再填入中转地址与 API Key。默认使用 `responses`、`gpt-6-astra`、`low`。
+3. **提交后台任务**：可先展开题目预览。提交成功后输入框清空 Key，任务在服务端继续执行。
+4. **查看与分享结果**：在详情中查看回答、子测试、错误或指纹，复制链接即可分享。画图题结合动画与四项结构说明人工判读。
 
-```text
-GET  /api/v1/config
-GET  /api/v1/tests?page=1
-GET  /api/v1/tests/summaries?ids=...
-POST /api/v1/tests                202
-GET  /api/v1/tests/:id
-GET  /api/v1/tests/:id/events     SSE
-GET  /api/v1/tests/:id/preview    沙箱动画预览
-GET  /api/v1/health
-```
+模型预设覆盖 GPT、Claude、DeepSeek、GLM、Kimi 等示例；实际可用模型和参数由中转决定，命名不一致时使用“自定义模型”。
 
-创建请求：
+“我的测试”仅在当前浏览器保存最近 **100 个记录 ID**，回答与结果仍保存在服务端。清除浏览器数据会丢失本地索引。首页侧栏提供标注为“不降智中转”的 [aloneapi.top](https://aloneapi.top/) 外部入口。
 
-```json
-{
-  "address": "https://relay.example.com",
-  "key": "sk-...",
-  "apiType": "responses",
-  "model": "gpt-6-astra",
-  "effort": "low",
-  "testMode": "dual"
-}
-```
+## 检测方式
 
-## 安全模型
+| 模式 | 检测内容 | 判读规则 |
+| --- | --- | --- |
+| `quick` | 糖果文字题 | 回答包含独立数字 `21` 则通过。 |
+| `strict` | 仅发送糖果题图片 | 回答包含独立数字 `21` 则通过，适合检查视觉通路。 |
+| `dual` | 文字与图片并发 | 两项请求成功后优先看严格项；严格项通过则通过，只有文字项通过则标记疑似掺水，否则未通过。 |
+| `cup` | 水杯相邻交换题 | 回答包含独立数字 `8` 则通过，不校验证明。 |
+| `pelican` | 鹈鹕骑自行车 HTML + SVG 动画 | 成功后保持“待人工判读”，按车轮、腿与脚踏、视角、鹈鹕喙四项对照。 |
+| `advanced` | 3 条 ModelTrace 长数字题 | 闭集指纹归因；完整有效结果匹配模型，或达到配置的目标等级时通过。 |
 
-- **原始 Key 不写入数据库、公开 API、SSE 或日志**；只在 worker 内存中存活到任务结束。
-- **回显脱敏**：上游答案与错误中的已知 Key、地址/主机及常见编码形式在保存前被替换；无效/不完整响应保留已接收证据并记为失败。
-- **地址和 Key 只公开脱敏值**，例如 `https://r****.com`、`sk-3****7890`。
-- **SSRF 防护**：仅 http/https；生产端口 80/443；禁止用户名密码、query/hash、相对路径、重定向；DNS 解析结果和实际连接 lookup 都会拒绝私网/loopback/link-local/保留地址。
-- **限流/容量**：每 IP 每小时创建次数、每 IP 活跃测试数、全局活跃任务数、队列上限、SSE 每 IP 连接数。
-- **CSP/Helmet**：静态 SPA 与 API 都经过 Fastify；HSTS 由 Caddy/nginx 在 TLS 层添加。
-- **答案渲染**：markdown-it `html:false`、禁用图片、链接 `noopener`、DOMPurify、KaTeX `trust:false`。
+请求失败不作为模型降智的依据。默认题目版本为 `2026-11-v3`，历史记录保留创建时的问题。
 
-完整威胁模型：[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)。
+<details>
+<summary><strong>展开判定细节与题目说明</strong></summary>
 
-### 你必须知道的边界
+- **数字匹配**：按 Unicode 数字边界识别，`210`、`21.5` 不会误算成 `21`；数字判定不验证推导是否正确。
+- **双测**：任一请求失败则无法判定；严格原图通过优先判为通过，即使文字项未通过。
+- **指纹**：任一请求失败则任务失败；有效回答不足 3 条则无法判定。预测模型与目标模型匹配，或预测等级不低于目标时通过；等级低于目标则未通过，等级缺失则无法判定。未收录模型可能被归到最相似的候选。
+- **画图**：逐字采用 [GetPlus 固定原题](https://www.getplus.ai/codex/gpt6-astra-jiangzhi)，不附加结构提示。格式缺失、截断或超过 512 KiB 时提供说明，不自动推断降智。四档自绘示意用于教学参考。
+- **题面一致性**：糖果题和水杯题采用公开基准措辞；不向题面或图片额外加入糖果形状分配提示，以免改变测试难度。
 
-1. **Key 必然经过本站服务器**；请求期间内存中存在原文。不要提交高价值/不可撤销的 Key。
-2. **公开记录默认包含问题、回答、脱敏地址/Key**；关闭公开列表只隐藏索引，持有记录 ID 或分享链接的人仍可访问详情、SSE 和动画预览。私密实例需要额外的访问控制。
-3. **任意中转地址**会带来 SSRF/出站流量风险；测试环境才可开 `ALLOW_PRIVATE_UPSTREAMS`。
-4. **指纹是闭集概率**，不是模型身份或能力证明；未收录模型会归到最相似的候选。
-5. 自动判定只看答案数字，水杯题不证明验证；可能出现误判。
+高级模式使用 ModelTrace 挑战生成器与指纹库，固定版本及集成说明见 [ModelTrace 文档](docs/MODELTRACE.md)。
 
-## ModelTrace
+</details>
 
-高级模式使用 [ModelTrace](https://github.com/xqy2006/ModelTrace) 的挑战生成器与指纹库，固定 commit：
+## 配置与数据
 
-```text
-6cd4a8ff0f3f4e49d6d6969dd2fbadfa1569fde2
-```
+完整变量见 [.env.example](.env.example)，主要配置如下：
 
-代码在 `vendor/modeltrace/`，带 MIT `LICENSE` 与 `NOTICE`。说明见 [docs/MODELTRACE.md](docs/MODELTRACE.md)。
+| 配置项 | 默认值 | 用途 |
+| --- | --- | --- |
+| `APP_NAME` / `APP_TAGLINE` | RelayCheck / 模型测智站 | 站点品牌。 |
+| `HOST` / `PORT` | `0.0.0.0` / `3000` | 服务监听地址与端口。 |
+| `DATA_DIR` | `./data` | SQLite 数据目录。 |
+| `DEFAULT_UPSTREAM_URL` | 空 | 预填中转地址。 |
+| `TEST_TIMEOUT_MS` | `300000` | 单次测试超时，单位毫秒。 |
+| `MAX_ANSWER_BYTES` | `2097152` | 每个子请求的回答上限，默认 2 MiB。 |
+| `MAX_ACTIVE_JOBS` / `MAX_QUEUE` | `4` / `20` | 活跃任务与排队上限。 |
+| `CREATE_PER_IP_PER_HOUR` / `ACTIVE_PER_IP` | `30` / `2` | 每 IP 创建与活跃测试限制。 |
+| `PUBLIC_LIST_ENABLED` | `true` | 控制公开列表；按 ID 访问详情仍可用。 |
+| `RETENTION_DAYS` / `MAX_RECORDS` | `30` / `500` | 已结束记录的保留天数与数量上限。 |
+| `TRUST_PROXY` | `false` | 直连关闭；单个受控反向代理可配置为 `1`。 |
+| `UPSTREAM_ALLOWLIST` | 空 | 可选目标域名白名单。 |
+| `ADMIN_TOKEN_HASH` | 空 | 管理令牌的 SHA-256 摘要；未配置时管理路由返回 404。 |
 
-## 配置
+服务使用单进程内存队列与 SQLite WAL，适合单实例部署。关闭页面不影响任务；服务停止或重启会将未完成任务标为中断，不会自动重试，因为原始 Key 不持久化。
 
-主要环境变量：
+<details>
+<summary><strong>模型等级、管理令牌与数据备份</strong></summary>
 
-| 变量 | 默认 | 说明 |
-|---|---|---|
-| `APP_NAME` / `APP_TAGLINE` | RelayCheck / 模型测智站 | 品牌 |
-| `PORT` | 3000 | 监听端口 |
-| `HOST` | `0.0.0.0` | 监听地址；裸 Node 配合本机代理时可设为 `127.0.0.1` |
-| `DATA_DIR` | `./data` | SQLite 目录 |
-| `DEFAULT_UPSTREAM_URL` | 空 | 表单默认地址 |
-| `TEST_TIMEOUT_MS` | 300000 | 单测试超时 |
-| `MAX_ANSWER_BYTES` | 2097152 | 每个子请求的回答字节上限 |
-| `MAX_ACTIVE_JOBS` / `MAX_QUEUE` | 4 / 20 | 全局容量 |
-| `UPSTREAM_MAX_CONCURRENCY` | 8 | 上游子请求并发上限 |
-| `CREATE_PER_IP_PER_HOUR` | 30 | 创建限流（自托管单用户可调高） |
-| `ACTIVE_PER_IP` | 2 | 每 IP 活跃测试 |
-| `LIST_PER_MINUTE` | 120 | 列表、摘要、详情、预览及 SSE 建连接口的每 IP 每分钟请求上限 |
-| `PUBLIC_LIST_ENABLED` | true | 仅控制公开列表，详情与分享链接仍可按 ID 访问 |
-| `TRUST_PROXY` | false | 直连关闭；受控单代理设置 1，并隔离后端端口 |
-| `SSE_MAX_PER_IP` / `SSE_MAX_CONNECTIONS` | 3 / 200 | 每 IP / 全站实时连接上限 |
-| `RETENTION_DAYS` / `MAX_RECORDS` | 30 / 500 | 已结束记录的保留天数 / 数量上限；排队和运行中的记录不参与清理 |
-| `ALLOW_PRIVATE_UPSTREAMS` | false | **仅测试** |
-| `UPSTREAM_ALLOWLIST` | 空 | 可选域名白名单，逗号分隔，支持精确域名和 `*.suffix` |
-| `ADMIN_TOKEN_HASH` | 空 | admin token 的 SHA-256 |
-| `MODEL_TIERS_FILE` | `./config/model-tiers.json` | 可选等级表 |
-
-完整示例见 [.env.example](.env.example)。
-
-### 模型等级
-
-默认 `config/model-tiers.json` 为空：高级模式会展示指纹，但只有“预测模型 == 被测模型”时自动 pass，否则 `unknown`。若要按等级判定，复制示例：
+**模型等级**：默认等级表为空，指纹匹配目标模型时才自动通过。需要等级判定时，复制示例并按自己的模型目录维护；示例不代表实际能力排序。
 
 ```bash
 cp config/model-tiers.example.json config/model-tiers.json
 ```
 
-示例等级只是演示，不代表真实模型能力排序；请按你自己的模型目录维护。
-
-## 部署
-
-### Docker Compose + Caddy（推荐）
+**管理令牌**：生成随机 token，仅将 SHA-256 摘要填入 `.env` 的 `ADMIN_TOKEN_HASH`，保存原 token 用于 `Authorization: Bearer <Token>`。
 
 ```bash
-cp .env.example .env
-# 编辑 SITE_ADDRESS、ADMIN_TOKEN_HASH 等
-docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
+node -e "const c=require('node:crypto');const t=c.randomBytes(32).toString('hex');console.log('Token: '+t);console.log('ADMIN_TOKEN_HASH='+c.createHash('sha256').update(t).digest('hex'))"
 ```
 
-- 首次启动 Caddy 自动申请 TLS 证书；域名需解析到服务器。
-- 数据在 `relaycheck-data` 命名卷，实际卷名带 Compose 项目前缀；容器在线备份命令见 [部署文档](docs/DEPLOY.md#备份与恢复)。
-- 本地 HTTP 预览设置 `SITE_ADDRESS=http://localhost`；`SITE_ADDRESS=localhost` 使用 Caddy 的本地 CA 提供 HTTPS。
+管理 API 提供统计、分页查询与删除已结束记录，详见 [API 文档](docs/API.md)。
 
-### 非 Docker
-
-```bash
-pnpm install --frozen-lockfile
-pnpm build
-pnpm start
-```
-
-前置 nginx 时必须为 SSE 关闭 buffering，并传递 `X-Forwarded-For`；示例见 [deploy/nginx.conf.example](deploy/nginx.conf.example)。
-
-详细部署、备份、升级说明：[docs/DEPLOY.md](docs/DEPLOY.md)。
-
-### 本地数据备份与恢复
+**备份与恢复**：使用在线备份 API，包含已提交的 WAL 数据，拒绝覆盖已有备份。
 
 ```bash
 pnpm db:backup ./data/relay-check.db ./backups/relay-check-2026-11-18.db
 pnpm db:restore ./backups/relay-check-2026-11-18.db ./data-restored
 ```
 
-备份使用 SQLite 在线备份 API，包含已提交的 WAL 数据，并拒绝覆盖已有备份。每次使用新的备份文件名；恢复到新目录后，停止旧实例，将 `DATA_DIR` 指向恢复目录，再启动单个实例。
+每次使用新的备份文件名。恢复到新目录后，停止旧实例，切换 `DATA_DIR`，再启动单个实例。容器备份见 [部署文档](docs/DEPLOY.md#备份与恢复)。
 
-## 开发与测试
+</details>
 
-```bash
-pnpm typecheck
-pnpm test          # unit + integration，不访问真实外网
-pnpm e2e           # 构建后跑 Playwright（本地 Windows 默认使用 Edge）
-pnpm question:render  # 重新生成严格模式图片
-pnpm smoke:prod       # 验证构建产物、重启与备份恢复
-pnpm check            # 依次执行类型检查、单元/集成、构建与浏览器测试、生产冒烟
-pnpm audit --prod     # 生产依赖安全检查
-```
+## 安全与隐私
 
-- `tests/mock-upstream.ts` 模拟 Responses/Chat SSE、401、200+error、超时、图片和大回答。
-- 所有集成测试使用临时 SQLite 目录与随机端口。
-- `playwright.config.ts` 的 E2E webServer 会启动 `tests/e2e/server.ts`（mock 3199、app 3100）。
-- Linux CI 若没有 Edge，设置 `PLAYWRIGHT_CHANNEL=` 并安装 Chromium：
+- **凭据处理**：Key 会经过本站服务端并发送给目标中转；原文只在任务内存中使用，已知凭据与地址回显在保存前脱敏。建议使用低额度、可撤销的 Key。
+- **记录可见范围**：问题、回答及脱敏信息默认公开。`PUBLIC_LIST_ENABLED=false` 只隐藏列表，持有 ID 或分享链接的人仍可访问详情、SSE 与预览；私密实例需要额外访问控制。
+- **上游访问**：生产仅允许 HTTP/HTTPS 的 80/443 端口，禁止重定向，并在 DNS 解析和实际连接时校验私网及保留地址。生产模式拒绝 `ALLOW_PRIVATE_UPSTREAMS=true`。
+- **内容渲染**：Markdown 禁用原始 HTML，KaTeX 使用 `trust:false`；动画在无同源权限的沙箱中运行，禁用外部资源、接口请求、弹窗及顶层跳转。独立 SVG 经清洗后以隔离图片展示。
+
+完整设计与边界见 [威胁模型](docs/THREAT_MODEL.md)。
+
+## 开发与贡献
+
+欢迎通过 [Issues](https://github.com/zhaoquan1003-cpu/RelayCheck/issues) 报告问题或提出改进建议，也欢迎提交 Pull Request。反馈时请附复现步骤，并移除 API Key 等敏感信息。
 
 ```bash
-pnpm exec playwright install chromium
-PLAYWRIGHT_CHANNEL= pnpm e2e
+pnpm typecheck       # Vue / TypeScript 类型检查
+pnpm test            # 单元与集成测试，不调用真实上游
+pnpm e2e             # 构建并运行 Playwright 浏览器测试
+pnpm smoke:prod      # 验证生产构建、重启、备份与恢复
+pnpm check           # 以上检查的完整流水线，包含构建
+pnpm audit --prod    # 生产依赖检查
 ```
 
-GitHub Actions 同时验证应用测试、生产依赖，以及 Docker 镜像、Compose 与 Caddy 配置。
+Windows 浏览器测试默认使用 Edge；Linux 使用 Chromium，可先执行 `pnpm exec playwright install chromium`。GitHub Actions 还会验证 Docker 镜像、Compose 和 Caddy 配置。
 
-## 目录
+<details>
+<summary><strong>项目结构</strong></summary>
 
 ```text
-src/client/              Vue 3 页面、组件、Markdown/KaTeX
-src/server/              Fastify、SQLite、队列、上游适配、SSRF 防护
-src/shared/              类型、问题包、判定
-vendor/modeltrace/       MIT 指纹代码与 bank（固定 commit）
-public/questions/        问题图片源/产物
-migrations/              SQLite schema
-tests/                   unit / integration / e2e
-scripts/                 生产环境入口、冒烟、数据库备份/恢复、题图生成
-Dockerfile               多阶段生产镜像
-deploy/                  Compose、Caddy、nginx、systemd 示例
-.github/workflows/       GitHub Actions 应用与容器检查
-docs/                    API、威胁模型、部署、指纹说明与界面截图
+src/client/           Vue 页面、组件、Markdown 与 KaTeX 渲染
+src/server/           Fastify、SQLite、队列、上游适配与安全校验
+src/shared/           类型、题目与判定规则
+vendor/modeltrace/    指纹代码与固定版本数据
+public/questions/     严格模式题图
+migrations/           SQLite 数据库结构
+scripts/              生产冒烟、备份恢复与题图生成
+config/               模型等级配置
+Dockerfile            多阶段生产镜像
+deploy/               Compose、Caddy、nginx 与 systemd 示例
+tests/                单元、集成与浏览器测试
+docs/                 API、安全、部署、截图与品牌素材
+.github/workflows/    持续集成配置
 ```
 
-## 已知未做 / 后续方向
+</details>
 
-登录/付费、号池批量巡检 UI、多实例 Postgres/Redis、Anthropic/Gemini 原生协议、模型库在线训练/更新、排行榜。
+## 文档导航
 
-## 许可与归属
+| 文档 | 内容 |
+| --- | --- |
+| [API 参考](docs/API.md) | 创建测试、查询结果、SSE、动画预览与管理接口。 |
+| [部署与运维](docs/DEPLOY.md) | Docker、裸 Node、反向代理、备份恢复及升级。 |
+| [安全模型](docs/THREAT_MODEL.md) | 凭据、SSRF、内容渲染与服务边界。 |
+| [ModelTrace 集成](docs/MODELTRACE.md) | 挑战生成、模型指纹与等级配置。 |
+| [GitHub Actions](https://github.com/zhaoquan1003-cpu/RelayCheck/actions) | 应用检查、浏览器测试与容器构建记录。 |
 
-- 本项目尚未声明开源许可证（`package.json` 未设置 `license`，仓库根目录没有 `LICENSE`）。
-- `vendor/modeltrace/` 为 MIT，版权归 xqy2006，详见其 `LICENSE`/`NOTICE`。
-- 未复制 yyt.im 的页面、CSS 或题目图片；糖果题/水杯题采用公开基准题面，严格模式图片为本站绘制。
+## 社区交流
+
+**QQ 交流群：`536776109`**
+
+欢迎交流部署经验、检测结果与功能建议。在 QQ 中搜索群号即可加入；可复现的问题和功能需求也欢迎提交到 [GitHub Issues](https://github.com/zhaoquan1003-cpu/RelayCheck/issues)。
+
+## 开源许可
+
+本项目采用 [MIT License](LICENSE) 开源，允许使用、修改、分发和商业使用；分发时请保留版权与许可声明。软件按原样提供，不附带任何担保。
+
+<p align="center">
+  <sub>RelayCheck · 保持好奇，认真判断。</sub>
+</p>

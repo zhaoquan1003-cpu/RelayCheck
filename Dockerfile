@@ -26,6 +26,7 @@ ENV DATA_DIR=/data
 RUN groupadd --gid 1001 relaycheck && useradd --uid 1001 --gid relaycheck --shell /usr/sbin/nologin --create-home relaycheck \
     && mkdir -p /data && chown relaycheck:relaycheck /data
 COPY --from=build --chown=relaycheck:relaycheck /app/package.json ./package.json
+COPY --chown=relaycheck:relaycheck LICENSE NOTICE ./
 COPY --from=build --chown=relaycheck:relaycheck /app/node_modules ./node_modules
 COPY --from=build --chown=relaycheck:relaycheck /app/dist ./dist
 COPY --from=build --chown=relaycheck:relaycheck /app/vendor ./vendor
