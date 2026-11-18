@@ -1,6 +1,7 @@
 # Optional nginx example. The app itself serves the SPA and the API.
 # Caddy is the default in docker-compose.yml because it handles TLS and SSE
 # flushing without external certbot plumbing.
+# Run the app with HOST=127.0.0.1 and TRUST_PROXY=1 for this single-proxy setup.
 
 server {
     listen 80;
@@ -15,15 +16,15 @@ server {
     ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
 
-    client_max_body_size 1m;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    client_max_body_size 32k;
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 330s;
     }
@@ -33,7 +34,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_buffering off;
         proxy_cache off;

@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import type { TestDetail } from '../../shared/types'
-import {
-  formatDate,
-  formatDuration,
-  formatFirstToken,
-  modeLabel,
-  progressLabel,
-} from '../lib/format'
+import { formatDate, formatDuration, formatFirstToken, modeLabel, progressLabel } from '../lib/format'
+import { questionForDisplay } from '../../shared/questions'
 import FingerprintPanel from './FingerprintPanel.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import StatusBadge from './StatusBadge.vue'
+import SvgArtPreview from './SvgArtPreview.vue'
 
 const props = defineProps<{
   open: boolean
@@ -28,6 +24,7 @@ const dualProbes = computed(() => props.test?.probes.filter((probe) => probe.kin
 const advancedProbes = computed(() => props.test?.probes.filter((probe) => probe.kind === 'advanced') ?? [])
 const isDual = computed(() => props.test?.testMode === 'dual')
 const isAdvanced = computed(() => props.test?.testMode === 'advanced')
+const isPelican = computed(() => props.test?.testMode === 'pelican')
 const isSingle = computed(() => Boolean(props.test && !isDual.value && !isAdvanced.value))
 const rawAnswer = computed(() => {
   if (!props.test) return ''
@@ -86,124 +83,137 @@ function probeLabel(kind: string) {
   if (kind === 'quick') return '旧文字题'
   if (kind === 'strict') return '严格原图题'
   if (kind === 'cup') return '水杯题'
+  if (kind === 'pelican') return 'SVG 画图题'
   return '指纹题'
 }
 </script>
 
 <template>
-  <dialog ref="dialogEl" class="detail-dialog" @close="onDialogClose" @cancel="onCancel" @click="onBackdrop">
+  <dialog ref="dialogEl" class="detail-dialog" aria-labelledby="detail-title" @close="onDialogClose" @cancel="onCancel" @click="onBackdrop">
     <div v-if="test" class="dialog-card" @click.stop>
       <header class="dialog-header">
-        <div>
-          <p class="eyebrow">TEST DETAIL / {{ test.id }}</p>
-          <h2>{{ modeLabel(test.testMode) }}</h2>
-          <p class="muted">
+        <div class="dialog-heading">
+          <p class="eyebrow">检测详情 <span class="detail-id">{{ test.id }}</span></p>
+          <h2 id="detail-title">{{ modeLabel(test.testMode) }}</h2>
+          <p class="dialog-subtitle">
             {{ test.model }} · {{ test.effort }} · {{ test.apiType }} ·
             {{ formatDate(test.createdAt) }}
           </p>
         </div>
         <div class="dialog-header-actions">
           <StatusBadge :status="test.status" :verdict="test.verdict" />
-          <button class="icon-button" type="button" aria-label="关闭详情" @click="close">✕</button>
+          <button class="icon-button" type="button" aria-label="关闭详情" @click="close">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg>
+          </button>
         </div>
       </header>
 
-      <div class="detail-meta">
-        <div>
-          <span class="meta-label">地址 / KEY</span>
-          <span class="mono">{{ test.addressMasked }}</span>
-          <span class="mono muted">{{ test.keyMasked }}</span>
-        </div>
-        <div>
-          <span class="meta-label">进度</span>
-          <span>{{ progressLabel(test) }}</span>
-        </div>
-        <div>
-          <span class="meta-label">首字 / 总耗时</span>
-          <span>{{ formatFirstToken(test.firstTokenMs) }} / {{ formatDuration(test.durationMs) }}</span>
-        </div>
-        <div>
-          <span class="meta-label">操作</span>
-          <button class="secondary small" type="button" @click="emit('refresh')">刷新快照</button>
-        </div>
-      </div>
-
-      <p v-if="test.verdictReason" class="verdict-reason">{{ test.verdictReason }}</p>
-      <p v-if="error" class="error-box">{{ error }}</p>
-
-      <div class="share-row">
-        <label for="share-url">分享链接</label>
-        <input id="share-url" :value="shareUrl" type="text" readonly />
-        <button class="secondary small" type="button" @click="copyShare">复制</button>
-        <span class="fine-print">{{ copyStatus }}</span>
-      </div>
-
-      <section v-if="isDual" class="dual-grid">
-        <article v-for="probe in dualProbes" :key="probe.id" class="probe-card">
-          <div class="probe-head">
-            <h3>{{ probeLabel(probe.kind) }}</h3>
-            <StatusBadge :status="probe.status" :verdict="probe.verdict" />
+      <div class="dialog-body">
+        <div class="detail-meta">
+          <div>
+            <span class="meta-label">中转地址与 Key</span>
+            <span class="mono">{{ test.addressMasked }}</span>
+            <span class="mono muted">{{ test.keyMasked }}</span>
           </div>
-          <p class="fine-print">
-            首字 {{ formatFirstToken(probe.firstTokenMs) }} ·
-            耗时 {{ formatDuration(probe.durationMs) }}
-          </p>
-          <p v-if="probe.error" class="error-box">{{ probe.error }}</p>
-          <MarkdownContent :source="probe.answer || (probe.status === 'running' ? '请求已发起，等待输出…' : '没有回答正文')" />
-        </article>
-      </section>
+          <div>
+            <span class="meta-label">进度</span>
+            <span>{{ progressLabel(test) }}</span>
+          </div>
+          <div>
+            <span class="meta-label">首字 / 总耗时</span>
+            <span>{{ formatFirstToken(test.firstTokenMs) }} / {{ formatDuration(test.durationMs) }}</span>
+          </div>
+          <div>
+            <span class="meta-label">操作</span>
+            <button class="secondary small" type="button" @click="emit('refresh')">刷新快照</button>
+          </div>
+        </div>
 
-      <section v-else-if="isSingle" class="answer-section">
-        <h3>回答正文</h3>
-        <MarkdownContent :source="test.answer || (test.status === 'running' ? '后台测试进行中…' : '没有回答正文')" />
-      </section>
+        <p v-if="test.verdictReason" class="verdict-reason">{{ test.verdictReason }}</p>
+        <p v-if="error" class="error-box">{{ error }}</p>
 
-      <template v-else-if="isAdvanced">
-        <FingerprintPanel :fingerprint="test.fingerprint" />
-        <section class="probe-list">
-          <h3>三次指纹题</h3>
-          <article v-for="probe in advancedProbes" :key="probe.id" class="probe-card">
+        <div class="share-row">
+          <label for="share-url">分享链接</label>
+          <input id="share-url" :value="shareUrl" type="text" readonly />
+          <button class="secondary small" type="button" @click="copyShare">复制</button>
+          <span v-if="copyStatus" class="fine-print copy-status" role="status">{{ copyStatus }}</span>
+        </div>
+
+        <section v-if="isDual" class="dual-grid">
+          <article v-for="probe in dualProbes" :key="probe.id" class="probe-card">
             <div class="probe-head">
-              <h4>第 {{ probe.ordinal + 1 }} 轮 · {{ probe.expectedCount }} 个数</h4>
+              <h3>{{ probeLabel(probe.kind) }}</h3>
               <StatusBadge :status="probe.status" :verdict="probe.verdict" />
             </div>
             <p class="fine-print">
               首字 {{ formatFirstToken(probe.firstTokenMs) }} ·
               耗时 {{ formatDuration(probe.durationMs) }}
             </p>
-            <details>
-              <summary>查看 prompt</summary>
-              <pre class="raw-pre">{{ probe.prompt }}</pre>
-            </details>
             <p v-if="probe.error" class="error-box">{{ probe.error }}</p>
-            <MarkdownContent :source="probe.answer || (probe.status === 'running' ? '等待输出…' : '没有回答正文')" />
+            <MarkdownContent :source="probe.answer || (probe.status === 'running' ? '请求已发起，等待输出…' : '没有回答正文')" />
           </article>
         </section>
-      </template>
 
-      <details class="question-section">
-        <summary>查看问题</summary>
-        <img
-          v-if="test.questionImage && (test.testMode === 'strict' || test.testMode === 'dual')"
-          class="strict-image"
-          :src="test.questionImage"
-          alt="严格模式发送给模型的糖果题原图"
-        />
-        <MarkdownContent :source="test.question" />
-      </details>
+        <section v-else-if="isSingle" class="answer-section">
+          <template v-if="isPelican">
+            <h3>渲染结果（人工判读）</h3>
+            <SvgArtPreview :source="test.answer" />
+            <p class="fine-print">
+              模型生成的 SVG 以隔离图片方式渲染，画得像不像需要你人工判断；自动判定只看结构。
+            </p>
+          </template>
+          <h3>回答正文</h3>
+          <MarkdownContent :source="test.answer || (test.status === 'running' ? '后台测试进行中…' : '没有回答正文')" />
+        </section>
 
-      <details class="raw-section">
-        <summary>查看原始 Markdown</summary>
-        <pre class="raw-pre">{{ rawAnswer }}</pre>
-      </details>
+        <template v-else-if="isAdvanced">
+          <FingerprintPanel :fingerprint="test.fingerprint" />
+          <section class="probe-list">
+            <h3>三次指纹题</h3>
+            <article v-for="probe in advancedProbes" :key="probe.id" class="probe-card">
+              <div class="probe-head">
+                <h4>第 {{ probe.ordinal + 1 }} 轮 · {{ probe.expectedCount }} 个数</h4>
+                <StatusBadge :status="probe.status" :verdict="probe.verdict" />
+              </div>
+              <p class="fine-print">
+                首字 {{ formatFirstToken(probe.firstTokenMs) }} ·
+                耗时 {{ formatDuration(probe.durationMs) }}
+              </p>
+              <details>
+                <summary>查看发送的题目</summary>
+                <pre class="raw-pre">{{ probe.prompt }}</pre>
+              </details>
+              <p v-if="probe.error" class="error-box">{{ probe.error }}</p>
+              <MarkdownContent :source="probe.answer || (probe.status === 'running' ? '等待输出…' : '没有回答正文')" />
+            </article>
+          </section>
+        </template>
 
-      <p v-if="test.error" class="error-box">{{ test.error }}</p>
-      <p v-if="test.fingerprint" class="fine-print">
-        指纹候选库为闭集；概率不是模型身份或能力的决定性证据。
-      </p>
+        <details class="question-section">
+          <summary>查看问题</summary>
+          <img
+            v-if="test.questionImage && (test.testMode === 'strict' || test.testMode === 'dual')"
+            class="strict-image"
+            :src="test.questionImage"
+            alt="严格模式发送给模型的糖果题原图"
+          />
+          <MarkdownContent :source="questionForDisplay(test.question)" />
+        </details>
+
+        <details class="raw-section">
+          <summary>查看原始 Markdown</summary>
+          <pre class="raw-pre">{{ rawAnswer }}</pre>
+        </details>
+
+        <p v-if="test.error" class="error-box">{{ test.error }}</p>
+        <p v-if="test.fingerprint" class="fine-print">
+          指纹候选库为闭集；概率不是模型身份或能力的决定性证据。
+        </p>
+      </div>
     </div>
     <div v-else class="dialog-card dialog-loading">
       <div class="spinner" />
+      <h2 id="detail-title">检测详情</h2>
       <p>{{ error || '正在加载测试详情…' }}</p>
       <button class="secondary" type="button" @click="close">关闭</button>
     </div>

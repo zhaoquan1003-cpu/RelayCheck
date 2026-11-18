@@ -1,4 +1,5 @@
 import type { Fingerprint, TestMode, Verdict } from './types'
+import { MAX_SVG_BYTES, extractSvgMarkup, inspectSvg } from './svg-art'
 
 export interface VerdictDecision {
   verdict: Verdict
@@ -18,7 +19,7 @@ export function containsStandaloneNumber(text: string, expected: number): boolea
   const source = String(text || '')
   const escaped = String(expected).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   // Reject matches inside a longer number or a decimal such as 210 / 21.5.
-  const pattern = new RegExp(`(?<![\\d.])${escaped}(?![\\d.])`, 'u')
+  const pattern = new RegExp(`(?<![\\p{N}.+\\-A-Za-z_])${escaped}(?![\\p{N}A-Za-z_]|[.,]\\p{N})`, 'u')
   return pattern.test(source)
 }
 
@@ -48,8 +49,8 @@ export function dualVerdict(probes: DualProbeView[]): VerdictDecision {
   if (!quick || !strict) {
     return { verdict: 'unknown', reason: '双测子结果不完整，无法判定。' }
   }
-  if (quick.status === 'failed' || strict.status === 'failed') {
-    return { verdict: 'unknown', reason: '至少一项请求失败，记录失败原因而不强行判定。' }
+  if (quick.status !== 'completed' || strict.status !== 'completed') {
+    return { verdict: 'unknown', reason: '至少一项请求未成功完成，无法判定。' }
   }
   if (strict.verdict === 'pass') {
     return { verdict: 'pass', reason: '严格原图题通过，按严格项判定为不降智。' }
@@ -65,19 +66,20 @@ export function advancedVerdict(
   fingerprint: Fingerprint | null,
   tiers: Record<string, number>,
 ): VerdictDecision {
-  if (!fingerprint) {
+  if (!fingerprint || fingerprint.used_outputs < 1 || !Number.isFinite(fingerprint.probability)) {
     return { verdict: 'unknown', reason: '没有可用的指纹结果。' }
   }
   const target = normalizeModelName(targetModel)
-  const predicted = normalizeModelName(fingerprint.prediction_name)
-  if (target === predicted) {
+  const predicted = normalizeModelName(fingerprint.prediction)
+  const predictedName = normalizeModelName(fingerprint.prediction_name)
+  if (target === predicted || target === predictedName) {
     return {
       verdict: 'pass',
       reason: `指纹最接近被测模型 ${fingerprint.prediction_name}（概率 ${(fingerprint.probability * 100).toFixed(1)}%）。`,
     }
   }
-  const targetTier = tiers[target]
-  const predictedTier = tiers[predicted]
+  const targetTier = Object.hasOwn(tiers, target) ? tiers[target] : undefined
+  const predictedTier = Object.hasOwn(tiers, predicted) ? tiers[predicted] : Object.hasOwn(tiers, predictedName) ? tiers[predictedName] : undefined
   if (targetTier == null || predictedTier == null) {
     return {
       verdict: 'unknown',
@@ -106,7 +108,45 @@ export function modeLabel(mode: TestMode): string {
       return '双测糖果题'
     case 'cup':
       return '水杯题'
+    case 'pelican':
+      return 'SVG 画图题（鹈鹕骑自行车）'
     case 'advanced':
       return 'ModelTrace 指纹'
+  }
+}
+
+export function pelicanVerdict(answer: string): VerdictDecision {
+  const extraction = extractSvgMarkup(answer)
+  if (extraction.tooLarge) {
+    return {
+      verdict: 'fail',
+      reason: `返回的 SVG 超过 ${Math.round(MAX_SVG_BYTES / 1024)} KB，无法安全渲染，画图题未通过。`,
+    }
+  }
+  if (!extraction.markup) {
+    return {
+      verdict: 'fail',
+      reason: '回答里没有找到完整的 <svg> 代码，画图题未通过。',
+    }
+  }
+  const inspection = inspectSvg(extraction.markup)
+  if (!inspection.complete) {
+    return {
+      verdict: 'fail',
+      reason: '返回的 <svg> 缺少根元素或闭合标签，画图题未通过。',
+    }
+  }
+  if (inspection.elements < 2) {
+    return {
+      verdict: 'fail',
+      reason: `返回的 SVG 只有 ${inspection.elements} 个图形元素，几乎没有可判读的内容，画图题未通过。`,
+    }
+  }
+  const filtered = inspection.risky.length
+    ? `；已过滤 ${inspection.risky.join('、')}`
+    : ''
+  return {
+    verdict: 'unknown',
+    reason: `已返回 SVG（${inspection.elements} 个图形元素、${inspection.paths} 条路径），渲染效果需要人工判读画功${filtered}。`,
   }
 }

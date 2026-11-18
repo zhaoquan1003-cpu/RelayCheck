@@ -1,6 +1,10 @@
 node_modules
 dist
 data
+backups/
+data-restored/
+.env.*
+!.env.example
 .prod-smoke
 .env
 .env.local

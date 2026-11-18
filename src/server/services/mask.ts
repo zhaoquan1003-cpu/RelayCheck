@@ -33,6 +33,24 @@ export function hashIp(ip: string): string {
   return createHash('sha256').update(String(ip || 'unknown')).digest('hex').slice(0, 32)
 }
 
+/** Scrub known request secrets before ANY upstream text reaches SQLite or SSE. */
+export function redactUpstreamText(text: string, key: string, address: string): string {
+  const secrets = new Set<string>([key])
+  try {
+    const url = new URL(address)
+    secrets.add(address)
+    secrets.add(url.origin)
+    secrets.add(url.hostname)
+  } catch { /* Only validated URLs normally reach this boundary. */ }
+  for (const secret of [...secrets].filter(Boolean).sort((a, b) => b.length - a.length)) {
+    const replacement = secret === key ? '[key]' : '[upstream]'
+    for (const variant of new Set([secret, encodeURIComponent(secret), JSON.stringify(secret).slice(1, -1)])) {
+      text = text.split(variant).join(replacement)
+    }
+  }
+  return text.replace(/\u0000/g, '')
+}
+
 export function sanitizeError(error: unknown, rawKey?: string, maxLength = 8000): string {
   let text = error instanceof Error ? error.message : String(error ?? '未知错误')
   if (rawKey) text = text.split(rawKey).join('[key]')

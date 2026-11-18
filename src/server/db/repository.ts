@@ -82,7 +82,7 @@ export interface NewProbeRecord {
   id: string
   testId: string
   ordinal: number
-  kind: 'quick' | 'strict' | 'cup' | 'advanced'
+  kind: 'quick' | 'strict' | 'cup' | 'pelican' | 'advanced'
   expectedCount: number | null
   prompt: string
 }
@@ -130,6 +130,12 @@ function defaultProgress(testMode: string): TestDetail['progress'] {
   const total = testMode === 'dual' ? 2 : testMode === 'advanced' ? 3 : 1
   return { current: 0, completed: 0, total, stage: 'queued' }
 }
+
+// Listing must not load megabytes of answers and prompts for every row.
+const SUMMARY_COLUMNS = `id, source, pool_id, group_name, address_masked, key_masked,
+  model, effort, api_type, test_mode, status, verdict, verdict_reason, progress_json,
+  comparison_json, fingerprint_json, question_image, created_at, started_at,
+  finished_at, duration_ms, first_token_ms, stream_version, error`
 
 export class TestRepository {
   constructor(private readonly db: DatabaseSync) {}
@@ -232,7 +238,7 @@ export class TestRepository {
   }
 
   getSummary(id: string): TestSummary | null {
-    const row = this.db.prepare('SELECT * FROM tests WHERE id = ?').get(id) as TestRow | undefined
+    const row = this.db.prepare(`SELECT ${SUMMARY_COLUMNS} FROM tests WHERE id = ?`).get(id) as TestRow | undefined
     return row ? this.toSummary(row) : null
   }
 
@@ -256,14 +262,14 @@ export class TestRepository {
     const safePage = Math.max(1, Math.floor(page) || 1)
     const totalRow = this.db.prepare('SELECT COUNT(*) AS count FROM tests').get() as { count: number }
     const rows = this.db
-      .prepare('SELECT * FROM tests ORDER BY created_at DESC LIMIT ? OFFSET ?')
+      .prepare(`SELECT ${SUMMARY_COLUMNS} FROM tests ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`)
       .all(pageSize, (safePage - 1) * pageSize) as unknown as TestRow[]
     return { records: rows.map((row) => this.toSummary(row)), total: Number(totalRow.count) }
   }
 
   listAll(limit = 200): TestSummary[] {
     const rows = this.db
-      .prepare('SELECT * FROM tests ORDER BY created_at DESC LIMIT ?')
+      .prepare(`SELECT ${SUMMARY_COLUMNS} FROM tests ORDER BY created_at DESC, id DESC LIMIT ?`)
       .all(limit) as unknown as TestRow[]
     return rows.map((row) => this.toSummary(row))
   }
@@ -283,19 +289,32 @@ export class TestRepository {
     const now = Date.now()
     this.db
       .prepare(
-        `UPDATE probes SET status = 'failed', error = '服务重启，任务中断'
+        `UPDATE probes SET status = 'failed', error = '服务重启，任务中断', finished_at = ?,
+            duration_ms = CASE WHEN started_at IS NULL THEN NULL ELSE ? - started_at END
          WHERE status IN ('queued', 'running')`,
       )
-      .run()
+      .run(now, now)
     this.db
       .prepare(
         `UPDATE tests
          SET status = 'failed', verdict = NULL, error = '服务重启，任务中断',
              verdict_reason = '服务重启，任务中断', finished_at = ?,
+             duration_ms = ? - COALESCE(started_at, created_at),
+             progress_json = json_set(COALESCE(progress_json, '{}'), '$.stage', 'failed',
+               '$.current', (SELECT COUNT(*) FROM probes WHERE test_id = tests.id),
+               '$.completed', (SELECT COUNT(*) FROM probes WHERE test_id = tests.id AND status = 'completed'),
+               '$.total', (SELECT COUNT(*) FROM probes WHERE test_id = tests.id)),
              stream_version = stream_version + 1
          WHERE status IN ('queued', 'running')`,
       )
-      .run(now)
+      .run(now, now)
+  }
+
+  failUnfinishedProbes(testId: string, error: string): void {
+    const now = Date.now()
+    this.db.prepare(`UPDATE probes SET status = 'failed', error = ?, finished_at = ?,
+      duration_ms = CASE WHEN started_at IS NULL THEN NULL ELSE ? - started_at END
+      WHERE test_id = ? AND status IN ('queued', 'running')`).run(error, now, now, testId)
   }
 
   delete(id: string): void {
@@ -304,11 +323,11 @@ export class TestRepository {
 
   cleanup(retentionDays: number, maxRecords: number): number {
     const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000
-    const old = this.db.prepare('DELETE FROM tests WHERE created_at < ?').run(cutoff)
+    const old = this.db.prepare("DELETE FROM tests WHERE status IN ('completed', 'failed') AND created_at < ?").run(cutoff)
     const extra = this.db
       .prepare(
         `DELETE FROM tests WHERE id IN (
-          SELECT id FROM tests ORDER BY created_at DESC LIMIT -1 OFFSET ?
+          SELECT id FROM tests WHERE status IN ('completed', 'failed') ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?
         )`,
       )
       .run(maxRecords)

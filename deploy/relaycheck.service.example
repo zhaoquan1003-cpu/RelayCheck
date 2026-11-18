@@ -1,0 +1,33 @@
+# Install as /etc/systemd/system/relaycheck.service after creating the relaycheck
+# user, copying the built application to /opt/relaycheck, and setting ownership of
+# /var/lib/relaycheck. Adjust the Node binary path for your installation.
+[Unit]
+Description=RelayCheck
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=relaycheck
+Group=relaycheck
+WorkingDirectory=/opt/relaycheck
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+Environment=DATA_DIR=/var/lib/relaycheck
+Environment=TRUST_PROXY=1
+EnvironmentFile=-/etc/relaycheck.env
+ExecStart=/usr/bin/node /opt/relaycheck/dist/server/index.js
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/relaycheck
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

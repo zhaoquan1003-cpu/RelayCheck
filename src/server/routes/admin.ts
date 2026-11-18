@@ -47,6 +47,9 @@ export function registerAdminRoutes(
     if (!/^[a-f0-9]{16}$/.test(id)) throw new HttpError(404, 'NOT_FOUND', 'not found')
     const existing = repository.getSummary(id)
     if (!existing) throw new HttpError(404, 'NOT_FOUND', 'not found')
+    if (existing.status === 'queued' || existing.status === 'running') {
+      throw new HttpError(409, 'TEST_ACTIVE', '测试尚未结束，请在结束后删除')
+    }
     repository.delete(id)
     return { ok: true }
   })

@@ -4,21 +4,64 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.28.5
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.28.5
       - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - run: node scripts/smoke-production.mjs
       - run: pnpm exec playwright install --with-deps chromium
-      - run: PLAYWRIGHT_CHANNEL= pnpm e2e
+      - run: pnpm exec playwright test
+        env:
+          PLAYWRIGHT_CHANNEL: ""
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-artifacts
+          path: test-results/
+          retention-days: 7
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose and Caddy configuration
+        run: |
+          docker compose --env-file .env.example -f deploy/docker-compose.yml config --quiet
+          docker run --rm -e SITE_ADDRESS=localhost -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+      - name: Build and run production image
+        run: |
+          docker build --tag relaycheck:ci .
+          docker run -d --name relaycheck-ci --read-only --tmpfs /tmp --security-opt no-new-privileges:true --cap-drop ALL -p 127.0.0.1:33000:3000 relaycheck:ci
+          curl --fail --silent --show-error --retry 20 --retry-delay 1 --retry-all-errors http://127.0.0.1:33000/api/v1/health
+          curl --fail --silent --show-error http://127.0.0.1:33000/ > /tmp/relaycheck-index.html
+          docker exec relaycheck-ci node -e "if(process.getuid()===0)process.exit(1);require('node:fs').accessSync('/data/relay-check.db');"
+          docker stop --time 10 relaycheck-ci
+          test "$(docker inspect --format '{{.State.ExitCode}}' relaycheck-ci)" = 0
+          docker start relaycheck-ci
+          curl --fail --silent --show-error --retry 10 --retry-delay 1 --retry-all-errors http://127.0.0.1:33000/api/v1/health
+      - name: Container logs and cleanup
+        if: always()
+        run: |
+          docker logs relaycheck-ci || true
+          docker rm --force --volumes relaycheck-ci || true

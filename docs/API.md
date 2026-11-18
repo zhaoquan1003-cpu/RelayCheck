@@ -8,7 +8,7 @@ Base: `/api/v1`. Responses are JSON unless noted. No cookies/CORS; all endpoints
 GET /api/v1/config
 ```
 
-Returns public branding, modes, questions, model presets, limits, and disclaimers. No secrets, no key.
+Returns public branding, modes, questions, model presets, limits, `publicListEnabled`, and disclaimers. No secrets, no key.
 
 ## List tests
 
@@ -44,6 +44,10 @@ GET /api/v1/tests?page=1
 }
 ```
 
+## Summaries by ID
+
+`GET /api/v1/tests/summaries?ids=0123456789abcdef,...` returns `{ ok, records, missingIds }` for up to 30 unique IDs. Used by My tests so polling never downloads full answers. Like detail/share URLs, this remains available when the public index is disabled. It is not an authorization mechanism.
+
 ## Create test
 
 ```http
@@ -64,12 +68,15 @@ Content-Type: application/json
 
 - `apiType`: `responses` | `chat_completions`
 - `effort`: `low` | `medium` | `high` | `xhigh` | `minimal` | `none`
-- `testMode`: `quick` | `strict` | `dual` | `cup` | `advanced`
+- `testMode`: `quick` | `strict` | `dual` | `cup` | `pelican` | `advanced`
 - Success: `202` with `{ "ok": true, "test": { summary } }`
 - Validation: `400` `VALIDATION_ERROR` with `fields`
 - Invalid target URL/SSRF: `400` `UPSTREAM_URL_REJECTED`
 - Queue/active limits: `429` `QUEUE_LIMIT` or `RATE_LIMITED`
 - Body limit: `413` `BODY_TOO_LARGE`
+- Shutdown: `503` `SHUTTING_DOWN`
+
+Pending DNS validation, queued jobs and running jobs all count toward `ACTIVE_PER_IP`. Capacity is reserved before DNS lookup. `TEST_TIMEOUT_MS` starts when a job leaves the queue, including time waiting for an upstream concurrency slot.
 
 The key is used in memory and is never persisted. It is not returned in any response.
 
@@ -106,6 +113,8 @@ data: {"ok":true,"test":{...full detail...}}\n\n
 - Heartbeat comment every 15 s.
 - `Cache-Control: no-store, no-transform`, `X-Accel-Buffering: no`.
 - Limit: `SSE_MAX_PER_IP` concurrent streams per IP (default 3).
+- Global stream limit: `SSE_MAX_CONNECTIONS` (default 200). Slow consumers are disconnected; snapshot polling can recover.
+- List, summary, detail and stream-creation routes are rate limited. `LIST_PER_MINUTE` defaults to 120 per route/IP.
 
 Detail pages also poll every 1.5 s, so a dropped SSE connection still converges.
 
@@ -127,6 +136,8 @@ GET    /api/v1/admin/tests?page=1
 DELETE /api/v1/admin/tests/:id
 ```
 
+Deleting queued or running records returns `409 TEST_ACTIVE`; terminal records can be deleted.
+
 ## Errors
 
 ```json
@@ -140,4 +151,4 @@ DELETE /api/v1/admin/tests/:id
 }
 ```
 
-Key/Authorization values are redacted from upstream errors before they are stored or returned.
+Known Key and upstream URL/host values are redacted from both answers and errors before storage or delivery. Truncated/incomplete responses are failed requests with partial evidence, never successful verdicts. `MAX_ANSWER_BYTES` bounds UTF-8 answer bytes; the transport also has a separate finite bound for framing and repeated snapshots.

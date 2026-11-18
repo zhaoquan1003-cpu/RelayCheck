@@ -2,10 +2,13 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { chromium } from '@playwright/test'
 import MarkdownIt from 'markdown-it'
-import { CANDY_QUESTION_TEXT } from '../src/shared/questions'
+import { CANDY_QUESTION_TEXT, questionForDisplay } from '../src/shared/questions'
 
+// 图片内容必须与模型收到的题目一致，只额外补上 Markdown 表头分隔行用于排版。
+// 不要在图片里添加“可以自行分配形状数量”“请给出证明”之类的额外提示：
+// 那会把弱模型问成 21，导致本站在外部判定为“降智”的中转上误报“不降智”。
 const md = new MarkdownIt({ html: false, breaks: true })
-const body = md.render(CANDY_QUESTION_TEXT)
+const body = md.render(questionForDisplay(CANDY_QUESTION_TEXT))
 
 const html = `<!doctype html>
 <html lang="zh-CN">
@@ -30,13 +33,6 @@ const html = `<!doctype html>
     border-radius: 18px;
     background: linear-gradient(145deg, #0d1929, #091320);
   }
-  .tag {
-    margin-bottom: 22px;
-    color: #8fb7d8;
-    font-family: Consolas, monospace;
-    font-size: 14px;
-    letter-spacing: .16em;
-  }
   p { margin: 0 0 18px; }
   strong { color: #ffffff; }
   table {
@@ -53,21 +49,17 @@ const html = `<!doctype html>
   th { color: #a7c7e0; background: rgba(84, 137, 180, 0.12); }
   td { color: #f4f7fb; }
   code { color: #9fe8d2; font-family: Consolas, monospace; }
-  .rule { height: 1px; margin: 26px 0; background: rgba(160, 190, 230, 0.16); }
-  .foot { color: #7f9bb5; font-size: 14px; line-height: 1.6; }
 </style>
 </head>
 <body>
   <main class="card">
-    <div class="tag">REASONING CHECK / CANDY TABLE</div>
     ${body}
-    <div class="rule"></div>
-    <p class="foot">请直接回答，并给出严格证明。不要调用搜索、代码执行器或其他工具。</p>
   </main>
 </body>
 </html>`
 
-const output = resolve(process.cwd(), 'public', 'questions', 'candy-strict.v1.png')
+const version = 'v2'
+const output = resolve(process.cwd(), 'public', 'questions', `candy-strict.${version}.png`)
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
 const browser = await chromium.launch(
   existsSync(edge)
@@ -75,7 +67,7 @@ const browser = await chromium.launch(
     : { headless: true },
 )
 try {
-  const page = await browser.newPage({ viewport: { width: 880, height: 1200 }, deviceScaleFactor: 2 })
+  const page = await browser.newPage({ viewport: { width: 880, height: 600 }, deviceScaleFactor: 1 })
   await page.setContent(html, { waitUntil: 'load' })
   await page.screenshot({ path: output, fullPage: true, type: 'png' })
   console.log(`wrote ${output}`)

@@ -10,6 +10,8 @@ export function modeLabel(mode: TestMode): string {
       return '双测糖果题'
     case 'cup':
       return '水杯题'
+    case 'pelican':
+      return 'SVG 画图题（鹈鹕骑自行车）'
     case 'advanced':
       return 'ModelTrace 指纹'
   }
@@ -25,6 +27,8 @@ export function modeShort(mode: TestMode): string {
       return 'DUAL'
     case 'cup':
       return 'CUP'
+    case 'pelican':
+      return 'PELICAN'
     case 'advanced':
       return 'TRACE'
   }

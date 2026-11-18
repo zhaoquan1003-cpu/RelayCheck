@@ -28,10 +28,25 @@ function textFromRequest(body: Record<string, unknown>): string {
 
 function mockAnswer(body: Record<string, unknown>, model: string): string {
   if (model === 'mock-fail') return '0'
+  if (model === 'mock-degraded') {
+    // Reproduces the answer a weaker backend gave through the user's relay:
+    // it never discovers that the shape split can be chosen, so it answers 29.
+    return '总糖果数为 41。要避免满足条件，最多可以取出 28 个（全部西瓜味 12 个，圆形苹果 7 个，圆形桃子 9 个），所以答案是 29 个。'
+  }
+  if (model === 'mock-svg') {
+    return '```svg\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120"><circle cx="60" cy="80" r="22"/><circle cx="140" cy="80" r="22"/><path d="M60 80 L100 45 L140 80"/></svg>\n```'
+  }
+  if (model === 'mock-svg-empty') {
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"></svg>'
+  }
+  if (model === 'mock-svg-hostile') {
+    return '```svg\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" onload="alert(1)"><script>alert(1)</script><circle cx="60" cy="80" r="22"/><circle cx="140" cy="80" r="22"/><image href="https://example.com/x.png" width="10" height="10"/><path d="M60 80 L100 45 L140 80"/></svg>\n```'
+  }
+  if (model === 'mock-no-svg') return '抱歉，我无法画图，只能给出文字说明。'
   if (model === 'mock-math') {
     return '答案是 \\(21\\) 颗。\n\n| 项目 | 值 |\n| --- | --- |\n| 圆形 | 9 |\n| 星形 | 12 |\n\n因此总数为 \\(9+12=21\\)。'
   }
-  if (model === 'mock-advanced') {
+  if (model === 'mock-advanced' || model === 'mock-partial-advanced') {
     // A long, deterministic but irregular sequence is enough to exercise the
     // fingerprint pipeline. It is not a calibrated model sample.
     return Array.from({ length: 320 }, (_, index) => ((index * 73 + 41) % 355) + 1).join(', ')
@@ -102,6 +117,9 @@ export async function startMockUpstream(port = 0): Promise<MockUpstream> {
       authorization: String(request.headers.authorization || ''),
     })
     const model = String(body.model || '')
+    if (model === 'mock-partial-advanced' && requests.filter((item) => item.body.model === model).length === 2) {
+      return reply.code(503).send({ error: { message: 'second fingerprint probe unavailable' } })
+    }
     if (model === 'mock-error-401') {
       return reply.code(401).send({ error: { message: 'mock invalid key', type: 'authentication_error' } })
     }

@@ -4,20 +4,30 @@ import { loadConfig } from './config'
 
 try {
   loadEnvFile('.env')
-} catch {
-  // .env is optional; docker-compose and the shell can provide env vars.
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
 }
 
 const config = loadConfig()
 const { app, runner } = await createApp(config)
 runner.startMaintenance()
 
+let closing = false
 const close = async (signal: string) => {
+  if (closing) return
+  closing = true
   app.log.info({ signal }, 'shutting down')
+  const deadline = setTimeout(() => {
+    app.log.error('shutdown deadline exceeded')
+    process.exit(1)
+  }, 15_000)
+  deadline.unref()
   try {
     await app.close()
-  } finally {
     process.exit(0)
+  } catch {
+    app.log.error('shutdown failed')
+    process.exit(1)
   }
 }
 
@@ -29,5 +39,6 @@ try {
   console.log(`[relaycheck] listening on http://${config.HOST}:${config.PORT}`)
 } catch (error) {
   app.log.error(error)
+  await app.close().catch(() => {})
   process.exit(1)
 }

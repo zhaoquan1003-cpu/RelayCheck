@@ -1,4 +1,4 @@
-export const TEST_MODES = ['quick', 'strict', 'dual', 'cup', 'advanced'] as const
+export const TEST_MODES = ['quick', 'strict', 'dual', 'cup', 'pelican', 'advanced'] as const
 export type TestMode = (typeof TEST_MODES)[number]
 
 export const API_TYPES = ['responses', 'chat_completions'] as const
@@ -28,7 +28,7 @@ export interface TestProgress {
 export interface ProbeResultView {
   id: string
   ordinal: number
-  kind: 'quick' | 'strict' | 'cup' | 'advanced'
+  kind: 'quick' | 'strict' | 'cup' | 'pelican' | 'advanced'
   expectedCount: number | null
   prompt: string
   answer: string
@@ -143,6 +143,7 @@ export interface QuestionPack {
   version: string
   question: string
   cupQuestion: string
+  pelicanQuestion: string
   strictQuestionLabel: string
   questionImage: string
   candyAnswer: number
@@ -156,6 +157,7 @@ export interface PublicConfig {
   defaultEffort: Effort
   defaultApiType: ApiType
   defaultUpstreamUrl: string
+  publicListEnabled: boolean
   modes: TestModeMeta[]
   apiTypes: Array<{ id: ApiType; label: string; help: string }>
   efforts: Array<{ id: Effort; label: string }>

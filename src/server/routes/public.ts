@@ -38,6 +38,7 @@ export function registerPublicRoutes(
       defaultEffort: 'low',
       defaultApiType: 'responses',
       defaultUpstreamUrl: config.DEFAULT_UPSTREAM_URL,
+      publicListEnabled: config.PUBLIC_LIST_ENABLED,
       modes: TEST_MODE_META,
       apiTypes: API_TYPE_META,
       efforts: EFFORT_META,
@@ -70,7 +71,22 @@ export function registerPublicRoutes(
     return { ok: true, records: result.records, total: result.total, page, pageSize: PAGE_SIZE }
   })
 
-  app.get('/api/v1/tests/:id', async (request) => {
+  app.get('/api/v1/tests/summaries', {
+    config: { rateLimit: { max: config.LIST_PER_MINUTE, timeWindow: '1 minute' } },
+  }, async (request) => {
+    const idsValue = (request.query as Record<string, unknown>)?.ids
+    if (typeof idsValue !== 'string') throw new HttpError(400, 'VALIDATION_ERROR', '请提供记录 ID')
+    const ids = [...new Set(idsValue.split(',').filter(Boolean))]
+    if (ids.length > PAGE_SIZE || ids.some((id) => !ID_RE.test(id))) {
+      throw new HttpError(400, 'VALIDATION_ERROR', `每次最多查询 ${PAGE_SIZE} 个有效 ID`)
+    }
+    const records = ids.map((id) => repository.getSummary(id)).filter((record) => record !== null)
+    return { ok: true, records, missingIds: ids.filter((id) => !records.some((record) => record.id === id)) }
+  })
+
+  app.get('/api/v1/tests/:id', {
+    config: { rateLimit: { max: config.LIST_PER_MINUTE, timeWindow: '1 minute' } },
+  }, async (request) => {
     const { id } = request.params as { id: string }
     if (!ID_RE.test(id)) throw new HttpError(404, 'NOT_FOUND', 'not found')
     const test = repository.getDetail(id)
@@ -78,7 +94,9 @@ export function registerPublicRoutes(
     return { ok: true, test }
   })
 
-  app.get('/api/v1/tests/:id/events', async (request, reply) => {
+  app.get('/api/v1/tests/:id/events', {
+    config: { rateLimit: { max: config.LIST_PER_MINUTE, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
     const { id } = request.params as { id: string }
     if (!ID_RE.test(id)) throw new HttpError(404, 'NOT_FOUND', 'not found')
     const test = repository.getDetail(id)

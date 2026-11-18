@@ -7,9 +7,14 @@ export function openDatabase(path: string): DatabaseSync {
     mkdirSync(dirname(path), { recursive: true })
   }
   const db = new DatabaseSync(path)
-  const migration = readFileSync(resolve(process.cwd(), 'migrations', '001_init.sql'), 'utf8')
-  db.exec(migration)
-  return db
+  try {
+    const migration = readFileSync(resolve(process.cwd(), 'migrations', '001_init.sql'), 'utf8')
+    db.exec(migration)
+    return db
+  } catch (error) {
+    db.close()
+    throw error
+  }
 }
 
 export function databasePath(dataDir: string): string {

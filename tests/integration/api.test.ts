@@ -38,8 +38,15 @@ describe('RelayCheck API integration', () => {
     const config = await fetch(`${context.base}/api/v1/config`)
     const configJson = (await config.json()) as any
     expect(configJson.ok).toBe(true)
-    expect(configJson.config.modes).toHaveLength(5)
+    expect(configJson.config.modes).toHaveLength(6)
     expect(configJson.config.questions.candyAnswer).toBe(21)
+    expect(configJson.config.questions.pelicanQuestion).toContain('鹈鹕')
+    expect(configJson.config.questions.version).toBe('2026-11-v2')
+    expect(configJson.config.questions.questionImage).toBe('/questions/candy-strict.v2.png')
+    expect(configJson.config.questions.question).toContain('在活动前决定摸出的糖果数目')
+    expect(configJson.config.questions.question).not.toContain('自行决定取多少颗圆形')
+    const modelIds = (configJson.config.models as Array<{ id: string }>).map((item) => item.id)
+    expect(modelIds).toEqual(expect.arrayContaining(['deepseek-v4.1-flash', 'glm-5.3', 'kimi-k3']))
   })
 
   it('runs a quick test in the background and masks secrets', async () => {
@@ -110,6 +117,81 @@ describe('RelayCheck API integration', () => {
     expect(test.probes).toHaveLength(2)
     expect(test.comparison).toHaveLength(2)
     expect(test.comparison.every((item: any) => item.status === 'completed')).toBe(true)
+    expect(test.question).toContain('糖果题（旧）')
+    expect(test.question).toContain('糖果题（严格）')
+  })
+
+  it('runs the pelican SVG drawing test and marks a valid drawing for manual review', async () => {
+    context.mock.reset()
+    const created = await postTest(context.base, {
+      address: context.mock.url,
+      key: KEY,
+      apiType: 'responses',
+      model: 'mock-svg',
+      effort: 'low',
+      testMode: 'pelican',
+    })
+    expect(created.status).toBe(202)
+    const test = await waitForTerminal(context.base, created.json.test.id)
+    expect(test.status).toBe('completed')
+    expect(test.verdict).toBe('unknown')
+    expect(test.answer).toContain('<svg')
+    expect(test.verdictReason).toContain('图形元素')
+    expect(test.probes).toHaveLength(1)
+    expect(test.probes[0].kind).toBe('pelican')
+    const sent = JSON.stringify(context.mock.requests[context.mock.requests.length - 1]?.body)
+    expect(sent).toContain('鹈鹕')
+  })
+
+  it('marks a pelican answer without SVG as a completed fail', async () => {
+    const created = await postTest(context.base, {
+      address: context.mock.url,
+      key: KEY,
+      apiType: 'responses',
+      model: 'mock-no-svg',
+      effort: 'low',
+      testMode: 'pelican',
+    })
+    const test = await waitForTerminal(context.base, created.json.test.id)
+    expect(test.status).toBe('completed')
+    expect(test.verdict).toBe('fail')
+    expect(test.verdictReason).toContain('没有找到')
+  })
+
+  it('marks the externally observed degraded answer 29 as a fail', async () => {
+    context.mock.reset()
+    const created = await postTest(context.base, {
+      address: context.mock.url,
+      key: KEY,
+      apiType: 'responses',
+      model: 'mock-degraded',
+      effort: 'low',
+      testMode: 'quick',
+    })
+    const test = await waitForTerminal(context.base, created.json.test.id)
+    expect(test.status).toBe('completed')
+    expect(test.verdict).toBe('fail')
+    expect(test.verdictReason).toContain('没有出现独立数字 21')
+    expect(test.answer).toContain('29')
+    const sent = JSON.stringify(context.mock.requests[context.mock.requests.length - 1]?.body)
+    expect(sent).toContain('在活动前决定摸出的糖果数目')
+    expect(sent).not.toContain('自行决定取多少颗圆形')
+  })
+
+  it('reports a degraded answer as a dual failure instead of a pass', async () => {
+    const created = await postTest(context.base, {
+      address: context.mock.url,
+      key: KEY,
+      apiType: 'responses',
+      model: 'mock-degraded',
+      effort: 'low',
+      testMode: 'dual',
+    })
+    const test = await waitForTerminal(context.base, created.json.test.id)
+    expect(test.status).toBe('completed')
+    expect(test.verdict).toBe('fail')
+    expect(test.verdictReason).toContain('均未通过')
+    expect(test.comparison.every((item: any) => item.verdict === 'fail')).toBe(true)
   })
 
   it('records a wrong answer as a completed fail', async () => {
@@ -244,8 +326,41 @@ describe('RelayCheck API integration', () => {
       expect(second.status).toBe(429)
       expect(second.json.ok).toBe(false)
       expect(second.json.error.code).toBe('RATE_LIMITED')
+      expect(second.json.error.message).toContain('创建检测')
+      expect(second.json.error.message).toContain('可重试')
     } finally {
       await limited.close()
+    }
+  })
+
+  it('does not rate-limit a normal multi-mode testing session', async () => {
+    const generous = await createTestContext({ CREATE_PER_IP_PER_HOUR: '8' })
+    try {
+      const statuses: number[] = []
+      for (let index = 0; index < 8; index += 1) {
+        const response = await postTest(generous.base, {
+          address: generous.mock.url,
+          key: KEY,
+          apiType: 'responses',
+          model: 'mock-pass',
+          effort: 'low',
+          testMode: 'quick',
+        })
+        statuses.push(response.status)
+      }
+      expect(statuses).toEqual([202, 202, 202, 202, 202, 202, 202, 202])
+      const blocked = await postTest(generous.base, {
+        address: generous.mock.url,
+        key: KEY,
+        apiType: 'responses',
+        model: 'mock-pass',
+        effort: 'low',
+        testMode: 'quick',
+      })
+      expect(blocked.status).toBe(429)
+      expect(blocked.json.error.message).toContain('创建检测')
+    } finally {
+      await generous.close()
     }
   })
 

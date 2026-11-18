@@ -44,6 +44,10 @@ function hostMatchesAllowlist(hostname: string, allowlist: string[]): boolean {
 function normalizeInput(input: string, allowPrivate: boolean): URL {
   const raw = input.trim()
   if (!raw) throw new UpstreamSecurityError('请填写上游地址')
+  if (/[\u0000-\u0020\\]/.test(raw)) throw new UpstreamSecurityError('上游地址不能包含空白或反斜杠')
+  if (/(?:^|\/)(?:\.|%2e){1,2}(?=\/|$)/i.test(raw)) {
+    throw new UpstreamSecurityError('上游路径不能包含相对路径片段')
+  }
   const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw) ? raw : `https://${raw}`
   let url: URL
   try {
@@ -74,7 +78,7 @@ export async function validateUpstream(
   config: Pick<AppConfig, 'allowPrivateUpstreams' | 'upstreamAllowlist'>,
 ): Promise<ValidatedUpstream> {
   const url = normalizeInput(input, config.allowPrivateUpstreams)
-  const hostname = url.hostname.toLowerCase()
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '')
   if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost')) {
     throw new UpstreamSecurityError('不允许访问本机地址')
   }
@@ -82,7 +86,23 @@ export async function validateUpstream(
     throw new UpstreamSecurityError('上游域名不在允许列表中')
   }
   const literal = ipaddr.isValid(hostname)
-  const addresses = literal ? [{ address: hostname }] : await lookup(hostname, { all: true, verbatim: true })
+  let addresses: Array<{ address: string }>
+  if (literal) addresses = [{ address: hostname }]
+  else {
+    let timer: NodeJS.Timeout | undefined
+    try {
+      addresses = await Promise.race([
+        lookup(hostname, { all: true, verbatim: true }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('DNS timeout')), 5000)
+        }),
+      ])
+    } catch {
+      throw new UpstreamSecurityError('上游域名无法解析或解析超时')
+    } finally {
+      clearTimeout(timer)
+    }
+  }
   if (!addresses.length) throw new UpstreamSecurityError('上游域名无法解析')
   if (!config.allowPrivateUpstreams) {
     for (const item of addresses) {

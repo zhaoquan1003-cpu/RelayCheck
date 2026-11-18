@@ -12,10 +12,10 @@ const used = computed(() => props.fingerprint?.used_outputs ?? 0)
   <section v-if="fingerprint" class="fingerprint-panel">
     <div class="panel-heading">
       <div>
-        <p class="eyebrow">FINGERPRINT / CLOSED SET</p>
+        <p class="eyebrow">模型指纹</p>
         <h3>指纹最接近</h3>
       </div>
-      <span class="mono-chip">{{ fingerprint.method }}</span>
+      <span class="fingerprint-method">{{ fingerprint.method }}</span>
     </div>
     <div class="fingerprint-hero">
       <div>
@@ -25,7 +25,7 @@ const used = computed(() => props.fingerprint?.used_outputs ?? 0)
           有效回答 {{ used }}/3 · 家族 {{ fingerprint.family_prediction_name }}
         </p>
       </div>
-      <div class="fingerprint-score">{{ formatPercent(fingerprint.probability) }}</div>
+      <div class="fingerprint-score"><strong>{{ formatPercent(fingerprint.probability) }}</strong><span>匹配概率</span></div>
     </div>
     <div class="fingerprint-bars">
       <div v-for="item in top" :key="item.model" class="fingerprint-row">
@@ -33,7 +33,7 @@ const used = computed(() => props.fingerprint?.used_outputs ?? 0)
           <span>{{ item.display_name }}</span>
           <span class="mono">{{ formatPercent(item.probability) }}</span>
         </div>
-        <div class="bar"><span :style="{ width: `${Math.max(0.4, item.probability * 100)}%` }" /></div>
+        <div class="bar" aria-hidden="true"><span :style="{ width: `${Math.max(0.4, item.probability * 100)}%` }" /></div>
       </div>
     </div>
     <p class="fine-print">

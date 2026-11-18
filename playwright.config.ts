@@ -12,14 +12,14 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:3100',
     headless: true,
-    channel: process.env.PLAYWRIGHT_CHANNEL || (isWindows ? 'msedge' : undefined),
+    channel: process.env.PLAYWRIGHT_CHANNEL === undefined ? (isWindows ? 'msedge' : undefined) : process.env.PLAYWRIGHT_CHANNEL || undefined,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
   webServer: {
     command: `"${process.execPath}" node_modules/tsx/dist/cli.mjs tests/e2e/server.ts`,
     url: 'http://127.0.0.1:3100/api/v1/health',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',

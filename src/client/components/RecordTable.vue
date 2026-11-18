@@ -6,7 +6,6 @@ import {
   formatDuration,
   formatFirstToken,
   modeLabel,
-  modeShort,
   shortId,
 } from '../lib/format'
 import StatusBadge from './StatusBadge.vue'
@@ -19,6 +18,7 @@ const props = defineProps<{
   loading: boolean
   tab: 'all' | 'mine'
   myCount: number
+  publicListEnabled: boolean
 }>()
 
 const emit = defineEmits<{
@@ -38,90 +38,99 @@ const subtitle = computed(() =>
   <section class="panel records-panel" id="records">
     <div class="panel-heading">
       <div>
-        <p class="eyebrow">PUBLIC FEED / 3S REFRESH</p>
         <h2>检测记录</h2>
-        <p class="muted">{{ subtitle }} · 关闭页面不会中断测试</p>
+        <p class="muted">{{ subtitle }} · 自动更新</p>
       </div>
       <div class="record-actions">
         <button class="secondary small" type="button" :disabled="loading" @click="emit('refresh')">
+          <svg class="refresh-icon" :class="{ refreshing: loading }" viewBox="0 0 20 20" aria-hidden="true"><path d="M16.7 8A7 7 0 1 0 17 12M17 3v5h-5" /></svg>
           {{ loading ? '刷新中…' : '刷新' }}
         </button>
       </div>
     </div>
 
-    <div class="tabs" role="tablist" aria-label="测试记录范围">
-      <button
-        type="button"
-        role="tab"
-        :aria-selected="tab === 'all'"
-        :class="['tab', { active: tab === 'all' }]"
-        @click="emit('tab', 'all')"
-      >
-        全部
-      </button>
-      <button
-        type="button"
-        role="tab"
-        :aria-selected="tab === 'mine'"
-        :class="['tab', { active: tab === 'mine' }]"
-        @click="emit('tab', 'mine')"
-      >
-        我的 <span class="tab-count">{{ myCount }}</span>
-      </button>
+    <div class="records-toolbar">
+      <div class="tabs" role="tablist" aria-label="测试记录范围">
+        <button
+          v-if="publicListEnabled"
+          type="button"
+          role="tab"
+          :aria-selected="tab === 'all'"
+          aria-controls="records-content"
+          :class="['tab', { active: tab === 'all' }]"
+          @click="emit('tab', 'all')"
+        >
+          全部
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="tab === 'mine'"
+          aria-controls="records-content"
+          :class="['tab', { active: tab === 'mine' }]"
+          @click="emit('tab', 'mine')"
+        >
+          我的 <span class="tab-count">{{ myCount }}</span>
+        </button>
+      </div>
+      <span class="record-retention-note">记录可通过链接分享</span>
     </div>
 
-    <div class="table-wrap">
-      <table>
+    <div class="table-wrap" id="records-content" :aria-busy="loading">
+      <table role="table" aria-label="检测记录">
         <thead>
           <tr>
             <th>开始时间</th>
             <th>地址 / Key</th>
-            <th>模型 / 模式</th>
+            <th>模型与检测方式</th>
             <th>状态 / 结果</th>
             <th>耗时</th>
-            <th />
+            <th><span class="visually-hidden">操作</span></th>
           </tr>
         </thead>
         <tbody>
           <template v-if="records.length">
-            <tr v-for="record in records" :key="record.id">
-              <td class="nowrap">
+            <tr v-for="record in records" :key="record.id" class="record-row">
+              <td class="record-date" data-label="开始时间">
                 <span class="cell-strong">{{ formatDate(record.createdAt) }}</span>
                 <small class="cell-sub mono">{{ shortId(record.id) }}</small>
               </td>
-              <td>
+              <td class="record-address" data-label="地址 / Key">
                 <span class="cell-strong mono">{{ record.addressMasked }}</span>
                 <small class="cell-sub mono">{{ record.keyMasked }}</small>
               </td>
-              <td>
+              <td class="record-model" data-label="模型">
                 <span class="cell-strong">{{ record.model }}</span>
                 <small class="cell-sub">
-                  <span class="mode-chip">{{ modeShort(record.testMode) }}</span>
                   {{ modeLabel(record.testMode) }} · {{ record.effort }} · {{ record.apiType === 'responses' ? 'Responses' : 'Chat' }}
                 </small>
               </td>
-              <td>
+              <td class="record-status" data-label="状态">
                 <StatusBadge :status="record.status" :verdict="record.verdict" />
                 <small class="cell-sub">
-                  {{ record.progress.stage === 'analyzing' ? '指纹分析中' : `${record.progress.completed}/${record.progress.total}` }}
+                  {{ record.progress.stage === 'analyzing' ? '指纹分析中' : `${record.progress.completed}/${record.progress.total} 项完成` }}
                   <template v-if="record.fingerprintSummary">
                     · {{ record.fingerprintSummary.predictionName }}
                     {{ (record.fingerprintSummary.probability * 100).toFixed(1) }}%
                   </template>
                 </small>
               </td>
-              <td class="nowrap">
+              <td class="record-duration" data-label="耗时">
                 <span class="cell-strong">{{ formatDuration(record.durationMs) }}</span>
                 <small class="cell-sub">首字 {{ formatFirstToken(record.firstTokenMs) }}</small>
               </td>
-              <td class="right">
-                <button class="secondary small" type="button" @click="emit('open', record.id)">查看回答</button>
+              <td class="record-open">
+                <button class="record-detail-button" type="button" @click="emit('open', record.id)">查看回答<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg></button>
               </td>
             </tr>
           </template>
           <tr v-else>
             <td colspan="6" class="empty-cell">
-              {{ loading ? '正在加载…' : tab === 'mine' ? '当前浏览器还没有保存过测试。' : '还没有公开记录。' }}
+              <div class="records-empty">
+                <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="6" width="28" height="36" rx="5" /><path d="M18 17h12M18 24h12M18 31h7" /></svg>
+                <strong>{{ loading ? '正在加载记录…' : '还没有检测记录' }}</strong>
+                <p>{{ tab === 'mine' ? '你在此浏览器发起的检测，会显示在这里。' : '完成第一次检测，结果就会出现在这里。' }}</p>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -132,7 +141,7 @@ const subtitle = computed(() =>
       <button class="secondary small" type="button" :disabled="page <= 1 || loading" @click="emit('page', page - 1)">
         上一页
       </button>
-      <span class="mono">{{ page }} / {{ pageCount }}</span>
+      <span>第 {{ page }} 页，共 {{ pageCount }} 页</span>
       <button
         class="secondary small"
         type="button"

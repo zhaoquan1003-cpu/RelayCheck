@@ -5,6 +5,16 @@ type Listener = (test: TestDetail) => void
 
 export class TestEventHub {
   private readonly listeners = new Map<string, Set<Listener>>()
+  private readonly connections = new Set<() => void>()
+
+  track(close: () => void): () => void {
+    this.connections.add(close)
+    return () => this.connections.delete(close)
+  }
+
+  closeAll(): void {
+    for (const close of [...this.connections]) close()
+  }
 
   subscribe(testId: string, listener: Listener): () => void {
     let set = this.listeners.get(testId)
@@ -43,7 +53,7 @@ export interface SseConnection {
 }
 
 export function openSse(
-  reply: { raw: ServerResponse; hijack: () => void },
+  reply: { raw: ServerResponse; hijack: () => void; getHeaders: () => Record<string, unknown> },
   test: TestDetail,
   hub: TestEventHub,
   onClose: () => void,
@@ -51,6 +61,7 @@ export function openSse(
   const raw = reply.raw
   reply.hijack()
   raw.writeHead(200, {
+    ...reply.getHeaders() as Record<string, string>,
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-store, no-transform',
     Connection: 'keep-alive',
@@ -59,31 +70,42 @@ export function openSse(
   })
   raw.write('retry: 3000\n\n')
   let closed = false
+  let sending = true
+  const socket = raw.socket
   const send = (value: TestDetail) => {
-    if (closed) return
-    raw.write(`data: ${JSON.stringify({ ok: true, test: value })}\n\n`)
-    if (value.status === 'completed' || value.status === 'failed') {
-      cleanup()
+    if (closed || !sending) return
+    const writable = raw.write(`data: ${JSON.stringify({ ok: true, test: value })}\n\n`)
+    // Never accumulate snapshots behind a slow reader. It can reconnect or poll.
+    if (!writable || value.status === 'completed' || value.status === 'failed') {
+      stopSending()
       raw.end()
     }
   }
   const heartbeat = setInterval(() => {
-    if (!closed) raw.write(': heartbeat\n\n')
+    if (!closed && sending && !raw.write(': heartbeat\n\n')) close()
   }, 15_000)
+  heartbeat.unref()
   const unsubscribe = hub.subscribe(test.id, send)
+  const stopSending = () => {
+    sending = false
+    clearInterval(heartbeat)
+    unsubscribe()
+  }
   const cleanup = () => {
     if (closed) return
     closed = true
-    clearInterval(heartbeat)
-    unsubscribe()
+    stopSending()
+    socket?.removeListener('timeout', close)
+    untrack()
     onClose()
   }
+  const close = () => { cleanup(); raw.destroy() }
+  const untrack = hub.track(close)
+  socket?.setTimeout(30_000, close)
+  // Keep a buffered response counted and tracked until it drains or closes.
+  raw.on('finish', cleanup)
   raw.on('close', cleanup)
   raw.on('error', cleanup)
   send(test)
-  if (test.status === 'completed' || test.status === 'failed') {
-    // send() has already called cleanup/end.
-    cleanup()
-  }
-  return { close: cleanup }
+  return { close }
 }

@@ -1,7 +1,7 @@
 import { createParser } from 'eventsource-parser'
 import type { Response as UndiciResponse } from 'undici'
 import type { ApiType, Effort } from '../../shared/types'
-import { sanitizeError } from '../services/mask'
+import { redactUpstreamText, sanitizeError } from '../services/mask'
 import { undiciFetch } from './security'
 
 export interface UpstreamProbeInput {
@@ -34,6 +34,16 @@ interface StreamState {
   fatalError: string | null
   finalText: string
   sawDone: boolean
+  answerBytes: number
+  maxAnswerBytes: number
+}
+
+function appendText(state: StreamState, text: string): void {
+  const bytes = Buffer.byteLength(text)
+  if (state.answerBytes + bytes > state.maxAnswerBytes) throw new Error(`回答超过 ${state.maxAnswerBytes} 字节上限`)
+  if (text && state.firstTokenAt == null) state.firstTokenAt = Date.now()
+  state.answer += text
+  state.answerBytes += bytes
 }
 
 function contentToText(content: unknown): string {
@@ -68,14 +78,19 @@ function errorMessageFromObject(value: unknown): string {
   return ''
 }
 
+function responseFailure(record: Record<string, unknown>): string | null {
+  if (record.error) return `HTTP 200 · 接口返回错误\n${errorMessageFromObject(record.error) || '上游返回错误'}`
+  if (record.status != null && record.status !== 'completed') return `上游响应未完成：${String(record.status)}`
+  return null
+}
+
 function extractStreamEvent(object: unknown, state: StreamState): void {
   if (!object || typeof object !== 'object') return
   const event = object as Record<string, unknown>
   const type = typeof event.type === 'string' ? event.type : ''
 
   if (type === 'response.output_text.delta' && typeof event.delta === 'string') {
-    if (!state.answer) state.firstTokenAt = Date.now()
-    state.answer += event.delta
+    appendText(state, event.delta)
     return
   }
   if (type === 'response.output_text.done' && typeof event.text === 'string') {
@@ -84,13 +99,16 @@ function extractStreamEvent(object: unknown, state: StreamState): void {
   }
   if (type === 'response.completed' && event.response && typeof event.response === 'object') {
     const response = event.response as Record<string, unknown>
-    if (typeof response.output_text === 'string') state.finalText = response.output_text
+    state.fatalError = responseFailure(response)
+    state.finalText = extractFinalText(response)
+    state.sawDone = true
     return
   }
-  if (type === 'response.failed' || type === 'error') {
+  if (type === 'response.failed' || type === 'response.incomplete' || type === 'error') {
     const response = event.response && typeof event.response === 'object' ? event.response as Record<string, unknown> : null
-    const detail = errorMessageFromObject(event) || errorMessageFromObject(response?.error) || errorMessageFromObject(response) || '上游返回错误事件'
+    const detail = errorMessageFromObject(event) || errorMessageFromObject(response?.error) || errorMessageFromObject(response) || (type === 'response.incomplete' ? '上游响应不完整' : '上游返回错误事件')
     state.fatalError = `HTTP 200 · 接口返回错误\n${detail}`
+    if (response) state.finalText = extractFinalText(response)
     return
   }
   if (event.error) {
@@ -105,14 +123,16 @@ function extractStreamEvent(object: unknown, state: StreamState): void {
     const message = choice.message as Record<string, unknown> | undefined
     const text = contentToText(delta?.content) || contentToText(message?.content)
     if (text) {
-      if (!state.answer) state.firstTokenAt = Date.now()
-      state.answer += text
+      appendText(state, text)
+    }
+    if (choice.finish_reason != null) {
+      if (choice.finish_reason === 'stop') state.sawDone = true
+      else state.fatalError = `上游响应未正常完成：${String(choice.finish_reason)}`
     }
     return
   }
   if (typeof event.delta === 'string') {
-    if (!state.answer) state.firstTokenAt = Date.now()
-    state.answer += event.delta
+    appendText(state, event.delta)
     return
   }
   if (typeof event.output_text === 'string') {
@@ -125,7 +145,7 @@ function extractFinalText(object: unknown): string {
   const record = object as Record<string, unknown>
   if (typeof record.output_text === 'string') return record.output_text
   const response = record.response && typeof record.response === 'object' ? record.response as Record<string, unknown> : null
-  if (response && typeof response.output_text === 'string') return response.output_text
+  if (response) return extractFinalText(response)
   if (Array.isArray(record.output)) {
     return record.output
       .map((item) => {
@@ -140,7 +160,6 @@ function extractFinalText(object: unknown): string {
     const message = first?.message as Record<string, unknown> | undefined
     return contentToText(message?.content) || contentToText(first?.text)
   }
-  if (typeof record.message === 'string') return record.message
   return ''
 }
 
@@ -168,7 +187,7 @@ function buildRequest(input: UpstreamProbeInput): Record<string, unknown> {
     }
   }
 
-  const content = imagePart ? (textPart ? [textPart, imagePart] : [imagePart]) : textPart
+  const content = imagePart ? (input.prompt ? [{ type: 'text', text: input.prompt }, imagePart] : [imagePart]) : textPart
   return {
     model: input.model,
     stream: true,
@@ -188,12 +207,13 @@ async function readTextResponse(response: UndiciResponse, maxBytes: number): Pro
       const { done, value } = await reader.read()
       if (done) break
       total += value.byteLength
-      if (total > maxBytes) throw new Error('回答超过 2MB')
+      if (total > maxBytes) throw new Error('上游响应体超过传输大小上限')
       text += decoder.decode(value, { stream: true })
     }
     text += decoder.decode()
     return text
   } finally {
+    await reader.cancel().catch(() => {})
     reader.releaseLock()
   }
 }
@@ -228,6 +248,13 @@ export async function runUpstreamProbe(input: UpstreamProbeInput): Promise<Upstr
   let statusCode: number | null = null
   let firstTokenAt: number | null = null
   let answer = ''
+  const state: StreamState = {
+    answer: '', firstTokenAt: null, fatalError: null, finalText: '', sawDone: false,
+    answerBytes: 0, maxAnswerBytes: input.maxAnswerBytes,
+  }
+  // Count the answer separately from JSON framing, reasoning events and the
+  // repeated final snapshot, while still bounding the total bytes received.
+  const maxWireBytes = Math.max(1024 * 1024, input.maxAnswerBytes * 16)
   try {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
@@ -250,29 +277,22 @@ export async function runUpstreamProbe(input: UpstreamProbeInput): Promise<Upstr
     }
 
     const contentType = (response.headers.get('content-type') || '').toLowerCase()
-    const state: StreamState = {
-      answer: '',
-      firstTokenAt: null,
-      fatalError: null,
-      finalText: '',
-      sawDone: false,
-    }
-
     if (contentType.includes('text/event-stream')) {
       const parser = createParser({
-        maxBufferSize: input.maxAnswerBytes + 1024 * 1024,
+        maxBufferSize: maxWireBytes,
         onEvent(event) {
+          if (state.sawDone || state.fatalError) return
           const data = event.data.trim()
           if (!data) return
           if (data === '[DONE]') {
             state.sawDone = true
             return
           }
-          try {
-            extractStreamEvent(JSON.parse(data), state)
-          } catch {
-            // Some providers send non-JSON comments or keep-alive data. Ignore them.
-          }
+          let parsed: unknown
+          try { parsed = JSON.parse(data) }
+          catch { state.fatalError = '上游 SSE 包含无效 JSON'; return }
+          extractStreamEvent(parsed, state)
+          if (Buffer.byteLength(state.finalText) > input.maxAnswerBytes) throw new Error(`回答超过 ${input.maxAnswerBytes} 字节上限`)
         },
         onError() {
           state.fatalError = state.fatalError || '上游 SSE 解析失败'
@@ -286,44 +306,50 @@ export async function runUpstreamProbe(input: UpstreamProbeInput): Promise<Upstr
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          if (state.fatalError) break
           total += value.byteLength
-          if (total > input.maxAnswerBytes) {
-            await reader.cancel().catch(() => {})
-            throw new Error('回答超过 2MB')
-          }
+          if (total > maxWireBytes) throw new Error('上游响应体超过传输大小上限')
           parser.feed(decoder.decode(value, { stream: true }))
+          if (state.sawDone || state.fatalError) break
         }
         if (!state.fatalError) parser.feed(decoder.decode())
       } finally {
+        answer = (state.answer || (Buffer.byteLength(state.finalText) <= input.maxAnswerBytes ? state.finalText : '')).trim()
+        firstTokenAt = state.firstTokenAt
+        await reader.cancel().catch(() => {})
         reader.releaseLock()
       }
       if (state.fatalError) throw new Error(state.fatalError)
-      answer = state.answer.trim()
-      if (!answer && state.finalText) answer = state.finalText.trim()
-      firstTokenAt = state.firstTokenAt
+      if (!state.sawDone) throw new Error('上游流提前结束，响应不完整')
+      if (state.finalText) answer = state.finalText.trim()
+      if (answer && firstTokenAt == null) firstTokenAt = Date.now()
     } else {
-      const text = await readTextResponse(response, input.maxAnswerBytes)
-      if (text.length > input.maxAnswerBytes) throw new Error('回答超过 2MB')
+      const text = await readTextResponse(response, maxWireBytes)
       let parsed: unknown = null
       try {
         parsed = JSON.parse(text)
       } catch {
         parsed = null
       }
-      if (parsed && typeof parsed === 'object' && (parsed as Record<string, unknown>).error) {
-        const message = errorMessageFromObject((parsed as Record<string, unknown>).error)
-        throw new Error(`HTTP 200 · 接口返回错误\n${message || '上游返回错误'}`)
-      }
-      answer = (parsed ? extractFinalText(parsed) : text).trim()
+      if (!parsed || typeof parsed !== 'object') throw new Error('上游未返回有效的 JSON 或 SSE 响应')
+      const record = parsed as Record<string, any>
+      answer = extractFinalText(parsed).trim()
+      if (Buffer.byteLength(answer) > input.maxAnswerBytes) { answer = ''; throw new Error(`回答超过 ${input.maxAnswerBytes} 字节上限`) }
+      const failure = responseFailure(record) || (record.response && typeof record.response === 'object' ? responseFailure(record.response) : null)
+      if (failure) throw new Error(failure)
+      const finishReason = record.choices?.[0]?.finish_reason
+      if (finishReason != null && finishReason !== 'stop') throw new Error(`上游响应未正常完成：${String(finishReason)}`)
       if (answer) firstTokenAt = Date.now()
     }
 
     if (!answer) throw new Error('接口未返回回答正文')
+    if (Buffer.byteLength(answer) > input.maxAnswerBytes) {
+      answer = ''
+      throw new Error(`回答超过 ${input.maxAnswerBytes} 字节上限`)
+    }
     const finishedAt = Date.now()
     return {
       status: 'completed',
-      answer,
+      answer: redactUpstreamText(answer, input.apiKey, input.url),
       error: '',
       statusCode,
       startedAt,
@@ -337,8 +363,8 @@ export async function runUpstreamProbe(input: UpstreamProbeInput): Promise<Upstr
     const isAbort = error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')
     return {
       status: 'failed',
-      answer,
-      error: sanitizeError(isAbort ? '请求被中止或超时' : message, input.apiKey),
+      answer: redactUpstreamText(answer, input.apiKey, input.url),
+      error: sanitizeError(redactUpstreamText(isAbort ? '请求被中止或超时' : message, input.apiKey, input.url), input.apiKey),
       statusCode,
       startedAt,
       finishedAt,

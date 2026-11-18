@@ -22,6 +22,7 @@
 - Not stored in SQLite; only a masked value is written.
 - Not included in SSE, list/detail API, or application logs.
 - Upstream error bodies are sanitized for `sk-*` tokens, `Authorization`, and `apiKey` patterns.
+- All upstream answers and errors also remove the exact submitted key, target URL/host, and common URL/JSON encodings before persistence. This cannot detect arbitrary transformations or unrelated credentials intentionally included by an upstream.
 - Key is cleared from the job object in `finally`.
 - Caveat: it exists in server memory and in a process crash dump. Disable core dumps and run as non-root in production.
 
@@ -38,15 +39,19 @@
 ### Abuse / cost / DoS
 
 - Per-IP create rate, per-IP active jobs, global active jobs, queue cap, SSE per-IP cap.
+- Admission includes pending validation and queued work, with reservations made before asynchronous DNS. Proxy trust defaults off; explicitly configured hop counts require network isolation of the backend.
+- SSE also has a global cap, backpressure disconnects, socket timeouts and bounded shutdown. Client summaries avoid repeatedly transferring full answers.
 - 32 KB request body, URL/key/model length caps.
-- 300 s total test timeout, 2 MB answer cap, 30 s headers timeout.
+- 300 s total test timeout, 2 MB answer cap, 512 KB SVG parsing cap for the drawing mode, 30 s headers timeout.
 - No automatic retries.
-- Admin can delete records; retention cleanup hourly.
+- Admin can delete terminal records; retention runs at completion and hourly, preserving active records.
 - Single instance: a determined attacker can still consume the global queue. Add a WAF/reverse-proxy auth or Cloudflare in front for public deployments.
 
 ### XSS / prompt injection
 
 - Model output is rendered with `html: false`, image syntax disabled, DOMPurify, KaTeX with `trust: false`.
+- Large answers use escaped plain text instead of expensive Markdown/math parsing.
+- SVG drawing answers are sanitized with the DOMPurify SVG profile (no `script`, `foreignObject`, or `style`, fragment-only URIs) and rendered as a `data:` URI inside an `<img>`, never inline, so model markup cannot execute script or fetch external resources.
 - Links get `noopener noreferrer`.
 - The page never executes model output.
 - The prompt asks the model not to use tools, but that is not a security control.
@@ -64,7 +69,7 @@
 - Dependencies are pinned by `pnpm-lock.yaml`; review updates.
 - ModelTrace is pinned by commit and carries its MIT license.
 - Run containers non-root, `no-new-privileges`, read-only root with a writable data volume.
-- CI should run `pnpm typecheck`, `pnpm test`, `pnpm build`, and ideally `pnpm e2e`.
+- CI runs dependency audit, type checking, regression tests, production artifact smoke tests, browser tests, and container build/start/restart checks.
 
 ## Out of scope
 

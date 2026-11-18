@@ -34,6 +34,12 @@ export const TEST_MODE_META: TestModeMeta[] = [
     help: '发送水杯相邻交换题，回答正文出现独立数字 8 即通过。自动判定不校验证明，请以完整回答人工核验。',
   },
   {
+    id: 'pelican',
+    label: '快速测试 · SVG 画图题（鹈鹕骑自行车）',
+    short: '画图',
+    help: '让目标模型画一只骑自行车的鹈鹕，并且只输出 SVG。拿到完整可渲染的 SVG 后由你人工判读画功；没有有效 SVG 会判为未通过。',
+  },
+  {
     id: 'advanced',
     label: '高级测试 · ModelTrace 指纹',
     short: 'ModelTrace',
@@ -61,6 +67,9 @@ export const MODEL_PRESETS: ModelPreset[] = [
   { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', hint: '上一代示例' },
   { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', hint: 'Claude 示例' },
   { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', hint: 'Claude 示例' },
+  { id: 'deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', hint: '国产 · DeepSeek' },
+  { id: 'glm-5.3', label: 'GLM-5.3', hint: '国产 · 智谱' },
+  { id: 'kimi-k3', label: 'Kimi K3', hint: '国产 · 月之暗面' },
   { id: 'custom', label: '自定义模型', hint: '填写上游支持的模型 ID' },
 ]
 
