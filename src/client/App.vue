@@ -342,6 +342,10 @@ onBeforeUnmount(() => {
           @open="openDetail" @page="changePage" @tab="switchTab" @refresh="refreshAll"
         />
         <aside class="side-column" id="how-it-works" aria-label="检测指南">
+          <a class="relay-link" href="https://aloneapi.top/" target="_blank" rel="noopener noreferrer">
+            <span class="relay-link-copy"><strong>不降智中转</strong><span>aloneapi.top</span></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10" /></svg>
+          </a>
           <section class="sidebar-card guide-card">
             <div class="sidebar-heading">
               <span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5.5c3-1.5 5-1.5 8 0 3-1.5 5-1.5 8 0v14c-3-1.5-5-1.5-8 0-3-1.5-5-1.5-8 0z"/><path d="M12 5.5v14"/></svg></span>
