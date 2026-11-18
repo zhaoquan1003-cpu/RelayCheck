@@ -21,6 +21,11 @@
 .mode-selected path { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .field-help { margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.8; }
 .settings-group { display: grid; gap: 19px; padding: 20px; background: var(--surface-subtle); border-radius: 14px; }
+.model-fetch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.model-fetch-row p { margin: 0; }
+.model-fetch-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; flex-shrink: 0; white-space: nowrap; }
+.model-fetch-message { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.model-fetch-message.is-error { color: #b42318; }
 .form-row.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .field { display: grid; align-content: start; gap: 8px; min-width: 0; }
 .field > span, .field > label { font-size: 13px; font-weight: 500; line-height: 1.5; }

@@ -10,4 +10,6 @@ export const createTestSchema = z.object({
   testMode: z.enum(TEST_MODES),
 })
 
+export const listModelsSchema = createTestSchema.pick({ address: true, key: true })
+
 export type CreateTestBody = z.infer<typeof createTestSchema>

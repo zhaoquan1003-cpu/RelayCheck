@@ -9,6 +9,7 @@ import { openSse } from '../services/sse-hub'
 import { PAGE_SIZE, API_TYPE_META, DISCLAIMERS, EFFORT_META, MODEL_PRESETS, TEST_MODE_META } from '../../shared/constants'
 import { QUESTION_PACK } from '../../shared/questions'
 import { extractDrawingArtifact, MAX_DRAWING_BYTES } from '../../shared/drawing-art'
+import { drawingPreviewDocument } from '../services/drawing-preview'
 import { createTestSchema } from './schemas'
 
 const ID_RE = /^[a-f0-9]{16}$/
@@ -107,15 +108,17 @@ export function registerPublicRoutes(
           defaultSrc: ["'none'"],
           scriptSrc: ["'unsafe-inline'"],
           styleSrc: ["'unsafe-inline'"],
-          imgSrc: ['data:'],
+          imgSrc: ['data:', 'blob:'],
           fontSrc: ['data:'],
           connectSrc: ["'none'"],
           objectSrc: ["'none'"],
           frameSrc: ["'none'"],
+          childSrc: ["'none'"],
           workerSrc: ["'none'"],
           baseUri: ["'none'"],
           formAction: ["'none'"],
           frameAncestors: ["'self'"],
+          webrtc: ["'block'"],
         },
       },
       xFrameOptions: { action: 'sameorigin' },
@@ -130,17 +133,15 @@ export function registerPublicRoutes(
       throw new HttpError(409, 'PREVIEW_NOT_READY', '画图检测尚未成功完成，暂不能预览。')
     }
     const artifact = extractDrawingArtifact(test.answer)
-    if (artifact.kind !== 'html' || !artifact.source) {
+    if (!artifact.kind || !artifact.source) {
       const message = artifact.error === 'too_large'
         ? `预览产物超过 ${MAX_DRAWING_BYTES / 1024} KiB，请查看原始回答。`
         : artifact.error === 'incomplete'
-          ? 'HTML 产物不完整，请查看原始回答。'
-          : artifact.kind === 'svg'
-            ? '此记录为独立 SVG，请使用图片预览。'
-            : '回答中没有可预览的 HTML，请查看原始回答。'
+          ? 'HTML / SVG 产物不完整，请查看原始回答。'
+          : '回答中没有可预览的完整 HTML / SVG 文档，请查看原始回答。'
       throw new HttpError(422, 'PREVIEW_UNAVAILABLE', message)
     }
-    return reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(artifact.source)
+    return reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(drawingPreviewDocument(artifact.source))
   })
 
   app.get('/api/v1/tests/:id/events', {

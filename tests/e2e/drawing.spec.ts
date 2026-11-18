@@ -89,6 +89,44 @@ test('CSS animation and script-created SVG survive the production preview policy
   await expect(frame.locator('#dynamic-scene circle')).toHaveCount(1)
 })
 
+test('standalone SVG retains its script, runs guarded animation, and restarts after stopping', async ({ page, request }) => {
+  const id = await createDrawing(request, 'mock-svg-animation')
+  const frame = await openPreview(page, id)
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.locator('.badge').first()).toContainText('待人工判读')
+  await expect(dialog.getByTestId('svg-preview')).toHaveCount(0)
+  const scene = frame.locator('#scene')
+  await expect(scene).toBeVisible()
+  await expect(scene.locator('script')).toContainText('requestAnimationFrame(ride)')
+  await expect.poll(() => scene.getAttribute('data-guards')).toBe(JSON.stringify({ rtc: true, modals: true, guardLocked: true }))
+  const crank = frame.locator('#crank')
+  const transform = await crank.getAttribute('transform')
+  await expect.poll(() => crank.getAttribute('transform')).not.toBe(transform)
+  const started = await scene.getAttribute('data-started')
+  expect(started).toBeTruthy()
+  const detail = await (await request.get(`/api/v1/tests/${id}`)).json()
+  expect(detail.test.answer).toContain('<script>')
+  expect(detail.test.answer).toContain('requestAnimationFrame(ride)')
+
+  const runningFrame = await (await page.getByTestId('drawing-preview').elementHandle())!.contentFrame()
+  await dialog.getByRole('button', { name: '停止预览' }).click()
+  await expect(page.getByTestId('drawing-preview')).toHaveCount(0)
+  expect(runningFrame!.isDetached()).toBe(true)
+  await dialog.getByRole('button', { name: '重新播放' }).click()
+  await expect.poll(() => scene.getAttribute('data-started')).not.toBe(started)
+  const restartedTransform = await crank.getAttribute('transform')
+  await expect.poll(() => crank.getAttribute('transform')).not.toBe(restartedTransform)
+})
+
+test('preview permits images created locally with Blob URLs', async ({ page, request }) => {
+  const id = await createDrawing(request, 'mock-html-blob-image')
+  const frame = await openPreview(page, id)
+  const image = frame.locator('#blob-image')
+  await expect(image).toBeVisible()
+  await expect(image).toHaveAttribute('src', /^blob:/)
+  await expect.poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBe(24)
+})
+
 test('generated HTML cannot reach the parent, storage, APIs, external resources, or top-level navigation', async ({ page, request, context }) => {
   const id = await createDrawing(request, 'mock-html-hostile')
   const escapedRequests: string[] = []
@@ -103,6 +141,7 @@ test('generated HTML cannot reach the parent, storage, APIs, external resources,
   const report = frame.locator('#security-report')
   await expect(report).not.toHaveText('running')
   expect(JSON.parse((await report.textContent())!)).toEqual({
+    rtc: true, modals: true, guardLocked: true,
     parentDom: true, parentStorage: true, ownStorage: true, popup: true,
     topNavigation: true, api: true, external: true, externalImage: true,
   })

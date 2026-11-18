@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import type { TestDetail } from '../../shared/types'
 import { formatDate, formatDuration, formatFirstToken, modeLabel, progressLabel } from '../lib/format'
 import { questionForDisplay } from '../../shared/questions'
+import { appPath } from '../lib/paths'
 import FingerprintPanel from './FingerprintPanel.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import StatusBadge from './StatusBadge.vue'
@@ -192,7 +193,7 @@ function probeLabel(kind: string) {
           <img
             v-if="test.questionImage && (test.testMode === 'strict' || test.testMode === 'dual')"
             class="strict-image"
-            :src="test.questionImage"
+            :src="appPath(test.questionImage)"
             alt="严格模式发送给模型的糖果题原图"
           />
           <MarkdownContent :source="questionForDisplay(test.question)" />

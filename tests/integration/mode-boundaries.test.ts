@@ -2,6 +2,34 @@ import { describe, expect, it } from 'vitest'
 import { createTestContext, waitForTerminal } from '../test-helpers'
 
 describe('mode completeness and protocol boundaries', () => {
+  it.each((['quick', 'strict', 'dual', 'cup', 'advanced'] as const).flatMap((testMode) =>
+    (['responses', 'chat_completions'] as const).map((apiType) => ({ testMode, apiType })),
+  ))('keeps drawing-only instructions out of $testMode over $apiType', async ({ testMode, apiType }) => {
+    const context = await createTestContext()
+    try {
+      const response = await context.app.inject({ method: 'POST', url: '/api/v1/tests', payload: {
+        address: context.mock.url, key: 'mode-test-key', apiType,
+        model: testMode === 'advanced' ? 'mock-advanced' : 'mock-pass', effort: 'high', testMode,
+      } })
+      expect(response.statusCode).toBe(202)
+      const test = await waitForTerminal(context.base, response.json().test.id)
+      expect(test.status).toBe('completed')
+      expect(context.mock.requests).toHaveLength(testMode === 'dual' ? 2 : testMode === 'advanced' ? 3 : 1)
+      for (const { body } of context.mock.requests) {
+        expect(body).not.toHaveProperty('instructions')
+        expect(body).not.toHaveProperty('tools')
+        if (apiType === 'responses') {
+          expect(body.reasoning).toEqual({ effort: 'high' })
+          expect(body.input).toEqual([expect.objectContaining({ role: 'user' })])
+          expect((body.input as object[])[0]).not.toHaveProperty('type')
+        } else {
+          expect(body.reasoning_effort).toBe('high')
+          expect(body.messages).toEqual([expect.objectContaining({ role: 'user' })])
+        }
+      }
+    } finally { await context.close() }
+  })
+
   it('runs the cup question through Chat Completions and sends the correct prompt', async () => {
     const context = await createTestContext()
     try {

@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { TestStatus } from '../../shared/types'
 import { extractDrawingArtifact, MAX_DRAWING_BYTES } from '../../shared/drawing-art'
-import SvgArtPreview from './SvgArtPreview.vue'
+import { appPath } from '../lib/paths'
 
 const props = defineProps<{
   testId: string
@@ -14,7 +14,7 @@ const artifact = computed(() => extractDrawingArtifact(props.source))
 const stopped = ref(false)
 const playback = ref(0)
 const loadFailed = ref(false)
-const previewUrl = computed(() => `/api/v1/tests/${encodeURIComponent(props.testId)}/preview`)
+const previewUrl = computed(() => appPath(`api/v1/tests/${encodeURIComponent(props.testId)}/preview`))
 const ready = computed(() => props.status === 'completed')
 
 // A fresh snapshot with the same answer must not restart the animation.
@@ -49,10 +49,10 @@ function replay() {
         <p class="eyebrow">模型生成结果</p>
         <h3>看看部件，是否一起运动。</h3>
       </div>
-      <span v-if="ready && artifact.kind" class="mono-chip">{{ artifact.kind === 'html' ? 'HTML 动画' : 'SVG 图片' }}</span>
+      <span v-if="ready && artifact.kind" class="mono-chip">{{ artifact.kind === 'html' ? 'HTML 动画' : 'SVG 动画' }}</span>
     </div>
 
-    <template v-if="ready && artifact.kind === 'html'">
+    <template v-if="ready && artifact.kind">
       <iframe
         v-if="!stopped && !loadFailed"
         :key="`${testId}:${playback}`"
@@ -70,10 +70,6 @@ function replay() {
         <button class="secondary small" type="button" :disabled="stopped || loadFailed" @click="stopped = true">停止预览</button>
       </div>
       <p class="fine-print">观察完整的踩踏过程。若画面空白或动作异常，可查看源码；预览不会替模型修正结果。</p>
-    </template>
-    <template v-else-if="ready && artifact.kind === 'svg'">
-      <SvgArtPreview :source="source" />
-      <p class="fine-print">本次返回独立 SVG，以图片方式兼容展示。可检查画面结构，完整动画需返回 HTML。</p>
     </template>
     <p v-else class="drawing-preview-note" role="status">{{ note }}</p>
   </div>

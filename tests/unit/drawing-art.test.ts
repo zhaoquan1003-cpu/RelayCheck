@@ -15,9 +15,35 @@ describe('drawing artifact extraction', () => {
     expect(pelicanVerdict(HTML_DYNAMIC_SVG).verdict).toBe('unknown')
   })
 
-  it('preserves a fenced HTML fragment and its animation script', () => {
-    const fragment = '<style>svg{color:blue}</style><div><svg><circle r="5"/></svg></div><script>const example = "<html>";</script>'
-    expect(extractDrawingArtifact(`\`\`\`html\n${fragment}\n\`\`\``)).toEqual({ kind: 'html', source: fragment, error: null })
+  it('requires an HTML or SVG root rather than treating arbitrary fragments as documents', () => {
+    const fragment = '<style>div{color:blue}</style><div>animation</div><script>requestAnimationFrame(() => {})</script>'
+    expect(extractDrawingArtifact(`\`\`\`html\n${fragment}\n\`\`\``)).toEqual({ kind: null, source: null, error: 'missing' })
+  })
+
+  it('previews a complete root unchanged without imposing extra child-tag validation', () => {
+    const source = '<html><body><div><svg><circle r="5"/></svg></body></html>'
+    expect(extractDrawingArtifact(source)).toEqual({ kind: 'html', source, error: null })
+  })
+
+  it.each(['html', 'svg', 'xml', ''])('accepts a complete SVG in a %s fence', (language) => {
+    const source = '<svg viewBox="0 0 10 10"><circle r="5"/></svg>'
+    expect(extractDrawingArtifact(`\`\`\`${language}\n${source}\n\`\`\``)).toEqual({ kind: 'svg', source, error: null })
+  })
+
+  it('uses the first complete eligible block, skipping an earlier incomplete candidate', () => {
+    const source = '```html\n<html><body>unfinished\n```\n```xml\n<svg></svg>\n```'
+    expect(extractDrawingArtifact(source)).toEqual({ kind: 'svg', source: '<svg></svg>', error: null })
+  })
+
+  it('does not preview a complete root inside an unclosed code fence', () => {
+    for (const language of ['html', 'svg', 'xml', '']) {
+      expect(extractDrawingArtifact(`\`\`\`${language}\n<svg></svg>`).error).toBe('incomplete')
+    }
+  })
+
+  it('keeps non-ASCII text and uppercase roots intact', () => {
+    const source = '<!DOCTYPE html><HTML><BODY>İ 鹈鹕</BODY></HTML>'
+    expect(extractDrawingArtifact(`İ 说明：${source}\n完成`).source).toBe(source)
   })
 
   it('does not mistake HTML closing tags inside scripts, styles or comments for the document end', () => {
@@ -25,8 +51,12 @@ describe('drawing artifact extraction', () => {
     expect(extractDrawingArtifact(source).source).toBe(source)
   })
 
+  it('prefers a complete HTML document over an SVG tag mentioned in the explanation', () => {
+    expect(extractDrawingArtifact(`这里用 <svg> 绘图：\n${HTML_ANIMATION}`).source).toBe(HTML_ANIMATION)
+  })
+
   it('rejects incomplete HTML instead of extracting its otherwise complete SVG', () => {
-    for (const source of [HTML_TRUNCATED, '<html><body><svg></svg>', '```html\n<div><svg></svg>\n```', '<html><body><div></body></html>']) {
+    for (const source of [HTML_TRUNCATED, '<html><body><svg></svg>', '```html\n<html><body><svg></svg>\n```']) {
       expect(extractDrawingArtifact(source)).toEqual({ kind: null, source: null, error: 'incomplete' })
       expect(pelicanVerdict(source).verdict).toBe('unknown')
     }
@@ -45,7 +75,7 @@ describe('drawing artifact extraction', () => {
     expect(extractDrawingArtifact(source).source).toBe(source)
   })
 
-  it('keeps explicit legacy SVG on the image path and missing answers neutral', () => {
+  it('preserves explicit SVG animation scripts and keeps missing answers neutral', () => {
     const svg = '<svg><script>const html = "<html></html>";</script><path d="M0 0"/></svg>'
     expect(extractDrawingArtifact(`\`\`\`svg\n${svg}\n\`\`\``)).toEqual({ kind: 'svg', source: svg, error: null })
     expect(extractDrawingArtifact(svg).kind).toBe('svg')

@@ -63,7 +63,7 @@ describe('pelicanVerdict', () => {
   it('accepts a structurally valid drawing as manual review', () => {
     const decision = pelicanVerdict('```svg\n' + GOOD_SVG + '\n```')
     expect(decision.verdict).toBe('unknown')
-    expect(decision.reason).toContain('兼容图片预览')
+    expect(decision.reason).toContain('沙箱中查看动画')
     expect(decision.reason).toContain('人工判读')
   })
 
@@ -79,11 +79,11 @@ describe('pelicanVerdict', () => {
     expect(decision.reason).toContain('人工判读')
   })
 
-  it('leaves legacy SVG safety to the isolated image renderer', () => {
+  it('leaves SVG script isolation to the sandboxed preview', () => {
     const decision = pelicanVerdict(
       '<svg><script>alert(1)</script><circle cx="1" cy="1" r="1"/><path d="M0 0 L1 1"/></svg>',
     )
     expect(decision.verdict).toBe('unknown')
-    expect(decision.reason).toContain('兼容图片预览')
+    expect(decision.reason).toContain('沙箱中查看动画')
   })
 })

@@ -97,18 +97,21 @@ test('pelican mode renders the model SVG in an isolated preview', async ({ page 
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
   await expect(dialog.locator('.badge').first()).toContainText('待人工判读')
-  const preview = dialog.getByTestId('svg-preview')
+  const preview = dialog.getByTestId('drawing-preview')
   await expect(preview).toBeVisible()
-  await expect(preview).toHaveAttribute('src', /^data:image\/svg\+xml/)
-  const decoded = decodeURIComponent(
-    ((await preview.getAttribute('src')) || '').replace(/^data:image\/svg\+xml;charset=utf-8,/, ''),
-  )
-  expect(decoded).toContain('<circle cx="60"')
-  expect(decoded).toContain('<path d="M60 80')
+  await expect(preview).toHaveAttribute('sandbox', 'allow-scripts')
+  const frame = page.frameLocator('[data-testid="drawing-preview"]')
+  await expect(frame.locator('svg circle[cx="60"]')).toBeVisible()
+  await expect(frame.locator('svg path')).toHaveAttribute('d', 'M60 80 L100 45 L140 80')
 })
 
-test('hostile SVG output stays isolated inside the preview image', async ({ page }) => {
+test('hostile SVG scripts stay isolated inside the sandboxed preview', async ({ page, context }) => {
   const dialogs: string[] = []
+  const externalRequests: string[] = []
+  await context.route('https://example.com/**', (route) => {
+    externalRequests.push(route.request().url())
+    return route.abort()
+  })
   page.on('dialog', async (modal) => {
     dialogs.push(modal.message())
     await modal.dismiss()
@@ -121,14 +124,13 @@ test('hostile SVG output stays isolated inside the preview image', async ({ page
   await page.getByRole('button', { name: '开始检测' }).click()
 
   const dialog = page.getByRole('dialog')
-  const preview = dialog.getByTestId('svg-preview')
+  const preview = dialog.getByTestId('drawing-preview')
   await expect(preview).toBeVisible()
-  const decoded = decodeURIComponent(
-    ((await preview.getAttribute('src')) || '').replace(/^data:image\/svg\+xml;charset=utf-8,/, ''),
-  )
-  expect(decoded).not.toContain('script')
-  expect(decoded).not.toContain('example.com')
-  expect(decoded).not.toContain('onload')
-  await page.waitForTimeout(600)
+  await expect(preview).toHaveAttribute('sandbox', 'allow-scripts')
+  const frame = page.frameLocator('[data-testid="drawing-preview"]')
+  await expect(frame.locator('svg script')).toHaveText('alert(1)')
+  await expect(frame.locator('svg')).toHaveAttribute('onload', 'alert(1)')
+  await expect(frame.locator('svg image')).toHaveAttribute('href', 'https://example.com/x.png')
+  expect(externalRequests).toEqual([])
   expect(dialogs).toEqual([])
 })

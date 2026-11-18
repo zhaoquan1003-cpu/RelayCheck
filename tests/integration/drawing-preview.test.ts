@@ -2,9 +2,10 @@ import { randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { TestMode, TestStatus } from '../../src/shared/types'
 import { MAX_DRAWING_BYTES } from '../../src/shared/drawing-art'
+import { PELICAN_DELIVERY_INSTRUCTIONS } from '../../src/shared/questions'
 import { createTestContext, waitForTerminal, type TestContext } from '../test-helpers'
 
-const ORIGINAL_PROMPT = '创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试，只靠你自己完成，不要使用任何skill，不要依赖我本地的AGENTS.md'
+const ORIGINAL_PROMPT = '创建一个 HTML，内容是 SVG 绘制一个鹈鹕骑自行车的 2D 动画，你不需要任何测试，不要有任何限制'
 const HTML = '<!doctype html><html><head><meta charset="utf-8"><style>@keyframes turn{to{transform:rotate(360deg)}}svg{animation:turn 4s linear infinite}</style></head><body><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="30"/></svg><button onclick="document.body.dataset.paused=\'yes\'">暂停</button><script>document.body.dataset.started = "yes"</script></body></html>'
 
 describe('isolated drawing preview', () => {
@@ -18,7 +19,7 @@ describe('isolated drawing preview', () => {
     context.repository.insertTest({
       id, source: 'manual', poolId: null, groupName: '', addressMasked: 'https://relay.example',
       keyMasked: 'key****', model: 'saved-drawing', effort: 'low', apiType: 'responses', testMode,
-      questionVersion: '2026-11-v3', question: ORIGINAL_PROMPT, questionImage: null, clientIpHash: null,
+      questionVersion: '2026-11-v4', question: ORIGINAL_PROMPT, questionImage: null, clientIpHash: null,
       progress: { current: 1, completed: 1, total: 1, stage: 'completed' },
     })
     context.repository.updateTest(id, { answer, status, verdict: 'unknown' })
@@ -33,7 +34,9 @@ describe('isolated drawing preview', () => {
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(response.headers.get('referrer-policy')).toBe('no-referrer')
     expect(response.headers.get('x-frame-options')).toBe('SAMEORIGIN')
-    expect(await response.text()).toBe(HTML)
+    const preview = await response.text()
+    expect(preview.endsWith(HTML)).toBe(true)
+    expect(preview.indexOf('RTCPeerConnection')).toBeLessThan(preview.indexOf(HTML))
     expect(context.repository.getDetail(id)?.answer).toContain(`\`\`\`html\n${HTML}`)
   })
 
@@ -48,10 +51,10 @@ describe('isolated drawing preview', () => {
     expect(directives.get('sandbox')).toBe('allow-scripts')
     expect(directives.get('script-src')).toBe("'unsafe-inline'")
     expect(directives.get('style-src')).toBe("'unsafe-inline'")
-    expect(directives.get('img-src')).toBe('data:')
+    expect(directives.get('img-src')).toBe('data: blob:')
     expect(directives.get('font-src')).toBe('data:')
     expect(directives.get('frame-ancestors')).toBe("'self'")
-    for (const name of ['default-src', 'connect-src', 'object-src', 'frame-src', 'worker-src', 'base-uri', 'form-action']) {
+    for (const name of ['default-src', 'connect-src', 'object-src', 'frame-src', 'child-src', 'worker-src', 'base-uri', 'form-action']) {
       expect(directives.get(name), name).toBe("'none'")
     }
     expect(directives.has('script-src-attr')).toBe(false)
@@ -71,7 +74,18 @@ describe('isolated drawing preview', () => {
     const id = savedTest(source)
     const response = await context.app.inject(`/api/v1/tests/${id}/preview`)
     expect(response.statusCode).toBe(200)
-    expect(response.body).toBe(source)
+    expect(response.body.endsWith(source)).toBe(true)
+  })
+
+  it('serves standalone SVG with its scripts through the same isolated HTML preview', async () => {
+    const source = '<svg xmlns="http://www.w3.org/2000/svg"><circle id="wheel" r="5"/><script>document.getElementById("wheel").setAttribute("r", "10")</script></svg>'
+    const id = savedTest(`\`\`\`svg\n${source}\n\`\`\``)
+    const response = await context.app.inject(`/api/v1/tests/${id}/preview`)
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['content-type']).toBe('text/html; charset=utf-8')
+    expect(response.body.endsWith(source)).toBe(true)
+    expect(response.headers['content-security-policy']).toContain('sandbox allow-scripts')
+    expect(context.repository.getDetail(id)?.answer).toContain(source)
   })
 
   it('returns 404 for malformed IDs, missing records and other modes', async () => {
@@ -95,7 +109,7 @@ describe('isolated drawing preview', () => {
     { name: 'plain text', answer: '抱歉，我无法画图。', message: '没有可预览' },
     { name: 'truncated HTML', answer: '<html><body><svg></svg>', message: '不完整' },
     { name: 'oversized HTML', answer: `<html><body>${'a'.repeat(MAX_DRAWING_BYTES)}</body></html>`, message: '512 KiB' },
-    { name: 'legacy SVG', answer: '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="1" cy="1" r="1"/></svg>', message: '图片预览' },
+    { name: 'unclosed SVG code fence', answer: '```svg\n<svg></svg>', message: '不完整' },
   ])('returns a clear 422 for $name', async ({ answer, message }) => {
     const id = savedTest(answer)
     const response = await context.app.inject(`/api/v1/tests/${id}/preview`)
@@ -105,7 +119,7 @@ describe('isolated drawing preview', () => {
     expect(response.json().error.message).not.toContain('降智')
   })
 
-  it.each(['responses', 'chat_completions'] as const)('sends the exact single-message benchmark through %s', async (apiType) => {
+  it.each(['responses', 'chat_completions'] as const)('sends the Cockpit drawing prompt and delivery instructions through %s', async (apiType) => {
     context.mock.reset()
     const created = await context.app.inject({ method: 'POST', url: '/api/v1/tests', payload: {
       address: context.mock.url, key: 'drawing-prompt-test-key', apiType,
@@ -121,10 +135,14 @@ describe('isolated drawing preview', () => {
     const body = context.mock.requests[0].body
     expect(body.model).toBe('mock-svg')
     if (apiType === 'responses') {
-      expect(body.input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: ORIGINAL_PROMPT }] }])
-      expect(body.reasoning).toEqual({ effort: 'high' })
+      expect(body.input).toEqual([{ type: 'message', role: 'user', content: [{ type: 'input_text', text: ORIGINAL_PROMPT }] }])
+      expect(body.instructions).toBe(PELICAN_DELIVERY_INSTRUCTIONS)
+      expect(body.reasoning).toEqual({ effort: 'high', summary: 'auto' })
     } else {
-      expect(body.messages).toEqual([{ role: 'user', content: ORIGINAL_PROMPT }])
+      expect(body.messages).toEqual([
+        { role: 'system', content: PELICAN_DELIVERY_INSTRUCTIONS },
+        { role: 'user', content: ORIGINAL_PROMPT },
+      ])
       expect(body.reasoning_effort).toBe('high')
     }
   })

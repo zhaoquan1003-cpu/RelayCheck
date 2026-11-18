@@ -1,7 +1,9 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-export default defineConfig({
+export default defineConfig(({ mode, command, isPreview }) => ({
+  // Keep local development on / so its API proxy continues to match /api.
+  base: command === 'build' || isPreview ? loadEnv(mode, process.cwd(), 'VITE_').VITE_BASE_PATH || '/' : '/',
   plugins: [vue()],
   server: {
     host: '127.0.0.1',
@@ -17,4 +19,4 @@ export default defineConfig({
     outDir: 'dist/client',
     emptyOutDir: true,
   },
-})
+}))

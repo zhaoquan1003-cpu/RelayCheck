@@ -14,6 +14,8 @@ COPY public ./public
 COPY migrations ./migrations
 COPY config ./config
 COPY scripts ./scripts
+ARG VITE_BASE_PATH=/
+ENV VITE_BASE_PATH=$VITE_BASE_PATH
 RUN pnpm build
 RUN pnpm prune --prod
 

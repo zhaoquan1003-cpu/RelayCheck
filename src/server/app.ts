@@ -19,6 +19,7 @@ import { sanitizeError } from './services/mask'
 import { registerPublicRoutes } from './routes/public'
 import { registerAdminRoutes } from './routes/admin'
 import { registerHealthRoute } from './routes/health'
+import { registerModelRoutes } from './routes/models'
 
 export interface AppBundle {
   app: FastifyInstance
@@ -193,6 +194,7 @@ export async function createApp(config: AppConfig): Promise<AppBundle> {
     })
 
     registerHealthRoute(app, { repository, runner, hub })
+    registerModelRoutes(app, config, dispatcher)
     registerPublicRoutes(app, { config, repository, runner, hub, sseLimiter })
     registerAdminRoutes(app, { config, repository, runner, hub })
 

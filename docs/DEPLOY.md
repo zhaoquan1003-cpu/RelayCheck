@@ -44,6 +44,45 @@ docker compose --env-file .env -f deploy/docker-compose.yml logs --tail=100 app
 
 ## 代理与访问边界
 
+### 部署在已有网站的子路径
+
+例如访问地址为 `https://aloneapi.top/zhishang/`，构建时设置 `VITE_BASE_PATH=/zhishang/`。此变量会写入前端构建，改变后必须重新构建。不设置时保持根路径 `/` 部署。
+
+```bash
+VITE_BASE_PATH=/zhishang/ pnpm build
+# 或构建容器镜像：
+docker build --build-arg VITE_BASE_PATH=/zhishang/ -t relaycheck:zhishang .
+```
+
+在已有反向代理后运行单个应用实例，不要再启动占用 80/443 的第二个 Caddy。应用仍使用内部根路径，代理负责移除 `/zhishang` 前缀。API、SSE、题图、动画预览和分享链接使用同一个公开前缀。
+
+使用仓库提供的覆盖配置可将应用仅发布到本机 `3101` 端口。在 `.env` 中设置 `VITE_BASE_PATH=/zhishang/`，然后执行以下命令；末尾的 `app` 用于只启动应用服务：
+
+```bash
+docker compose -p relaycheck --env-file .env \
+  -f deploy/docker-compose.yml -f deploy/docker-compose.existing-proxy.yml \
+  up -d --build app
+curl -fsS http://127.0.0.1:3101/api/v1/health
+```
+
+`RELAYCHECK_PORT` 可覆盖本机端口，`RELAYCHECK_TAG` 可指定发布镜像标签。默认持久化卷为 `relaycheck_relaycheck-data`，更新时保持项目名 `relaycheck`。
+
+将以下配置合并进已有 Caddy 站点块，并将原站的处理规则放进最后的 `handle`。示例中的 `127.0.0.1:3101` 要替换为 Caddy 实际可访问的应用地址；如果 Caddy 和应用都是容器，应使用共同 Docker 网络中的服务名和容器端口。
+
+```caddyfile
+redir /zhishang /zhishang/?{http.request.uri.query} 308
+handle_path /zhishang/* {
+    reverse_proxy 127.0.0.1:3101 {
+        flush_interval -1
+    }
+}
+handle {
+    # 保留原站的处理规则，例如 reverse_proxy 原站地址。
+}
+```
+
+先备份代理配置，验证新配置后再平滑重载。验证 `/zhishang` 重定向、`/zhishang/api/v1/health`、首页资源、题图与原站首页均正常。使用现有受信任的单层代理时设置 `TRUST_PROXY=1`，并确保应用端口仅供代理访问。
+
 直接运行时默认 `TRUST_PROXY=false`，客户端无法用 `X-Forwarded-For` 伪造限流身份。Compose 固定为 `TRUST_PROXY=1`，表示只有 Caddy 这一跳受信任，且应用端口不发布。旧值 `TRUST_PROXY=true` 不再接受。
 
 使用示例 nginx 时，配置 `HOST=127.0.0.1`、`TRUST_PROXY=1`，并确保外部无法直接访问 Node 端口。示例会重写 `X-Forwarded-For` 为真实连接来源。多层代理需按实际拓扑配置跳数并在最外层清洗转发头；不要靠增加跳数修复看似相同的用户 IP。TLS 代理应禁用 SSE 缓冲并允许持续连接。

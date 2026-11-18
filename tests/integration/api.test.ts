@@ -41,7 +41,7 @@ describe('RelayCheck API integration', () => {
     expect(configJson.config.modes).toHaveLength(6)
     expect(configJson.config.questions.candyAnswer).toBe(21)
     expect(configJson.config.questions.pelicanQuestion).toContain('鹈鹕')
-    expect(configJson.config.questions.version).toBe('2026-11-v3')
+    expect(configJson.config.questions.version).toBe('2026-11-v4')
     expect(configJson.config.questions.questionImage).toBe('/questions/candy-strict.v2.png')
     expect(configJson.config.questions.question).toContain('在活动前决定摸出的糖果数目')
     expect(configJson.config.questions.question).not.toContain('自行决定取多少颗圆形')

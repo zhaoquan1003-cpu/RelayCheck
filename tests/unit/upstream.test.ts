@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { Agent } from 'undici'
 import { describe, expect, it } from 'vitest'
 import { runUpstreamProbe, type UpstreamProbeInput } from '../../src/server/upstream/client'
+import { PELICAN_DELIVERY_INSTRUCTIONS, PELICAN_QUESTION_TEXT } from '../../src/shared/questions'
 
 type Handler = (response: ServerResponse, request: IncomingMessage, body: Record<string, any>) => void
 const KEY = 'test-secret-1234567890'
@@ -37,6 +38,43 @@ function stream(response: ServerResponse, payload: string, end = true): void {
   if (end) response.end(payload)
   else response.write(payload)
 }
+
+describe('drawing request format', () => {
+  it.each(['responses', 'chat_completions'] as const)('sends the Cockpit delivery contract through %s', async (apiType) => {
+    let requestBody: Record<string, any> = {}
+    await withUpstream((response, _request, body) => {
+      requestBody = body
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ output_text: '<html></html>' }))
+    }, async (probe) => {
+      const result = await probe({
+        apiType, model: 'drawing-model', effort: 'high', prompt: PELICAN_QUESTION_TEXT,
+        drawingInstructions: PELICAN_DELIVERY_INSTRUCTIONS,
+      })
+      expect(result.status).toBe('completed')
+    })
+    expect(requestBody.model).toBe('drawing-model')
+    expect(requestBody.stream).toBe(true)
+    expect(requestBody).not.toHaveProperty('tools')
+    expect(requestBody).not.toHaveProperty('tool_choice')
+    if (apiType === 'responses') {
+      expect(requestBody).toEqual({
+        model: 'drawing-model', stream: true, store: false,
+        instructions: PELICAN_DELIVERY_INSTRUCTIONS,
+        reasoning: { effort: 'high', summary: 'auto' },
+        input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: PELICAN_QUESTION_TEXT }] }],
+      })
+    } else {
+      expect(requestBody).toEqual({
+        model: 'drawing-model', stream: true, reasoning_effort: 'high',
+        messages: [
+          { role: 'system', content: PELICAN_DELIVERY_INSTRUCTIONS },
+          { role: 'user', content: PELICAN_QUESTION_TEXT },
+        ],
+      })
+    }
+  })
+})
 
 describe('upstream response integrity', () => {
   it('rejects a truncated stream even when its partial answer contains the expected number', async () => {

@@ -37,7 +37,7 @@ export const TEST_MODE_META: TestModeMeta[] = [
     id: 'pelican',
     label: '画图检测 · 鹈鹕骑自行车动画',
     short: '画图',
-    help: '使用固定原题生成 HTML + SVG 骑行动画。打开结果，按车轮、腿与脚踏、视角和鹈鹕喙四项对照判读；单次结果不作模型降智的确定结论。',
+    help: '使用 Cockpit Tools 的固定题目和交付指令生成骑行动画，HTML 与 SVG 均可运行。打开结果人工判读；四项观察提示仅供参考，不自动评分。',
   },
   {
     id: 'advanced',

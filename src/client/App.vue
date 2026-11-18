@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { CreateTestInput, PublicConfig, TestDetail, TestSummary } from '../shared/types'
 import { ApiError, api } from './lib/api'
+import { appPath } from './lib/paths'
 import { addMyTest, loadMyTests, removeMyTest } from './lib/my-tests'
 import TestForm from './components/TestForm.vue'
 import RecordTable from './components/RecordTable.vue'
@@ -215,7 +216,7 @@ function startDetailPoll(id: string) {
 
 function startDetailStream(id: string) {
   stopDetailStream()
-  detailStream = new EventSource(`/api/v1/tests/${id}/events`)
+  detailStream = new EventSource(appPath(`api/v1/tests/${id}/events`))
   detailStream.onmessage = (event) => {
     if (detailId.value !== id || !detailOpen.value) return
     try {
@@ -292,7 +293,7 @@ onBeforeUnmount(() => {
     <a class="skip-link" href="#new-test">跳转到新建检测</a>
     <header class="site-header">
       <div class="header-inner">
-        <a class="brand" href="/" aria-label="RelayCheck 首页">
+        <a class="brand" :href="appPath()" aria-label="RelayCheck 首页">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 32 32" fill="none"><rect x="7" y="6" width="13" height="17" rx="4" stroke="currentColor" stroke-width="1.7" opacity=".55"/><rect x="12" y="10" width="13" height="17" rx="4" fill="currentColor"/><path d="m16 18 2 2 3.5-4" stroke="#0875df" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
@@ -395,7 +396,7 @@ onBeforeUnmount(() => {
       <div v-if="!appError" class="spinner" aria-label="正在加载" />
       <h1>{{ appError ? '暂时无法连接' : '正在准备你的检测空间' }}</h1>
       <p v-if="appError" class="error-box" role="alert">{{ appError }}</p>
-      <a v-if="appError" class="secondary" href="/">重新加载</a>
+      <a v-if="appError" class="secondary" :href="appPath()">重新加载</a>
       <p v-else>马上就好。</p>
     </main>
 

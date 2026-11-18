@@ -14,6 +14,35 @@ const scene = `<svg id="scene" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6
 
 const style = `<style>html,body{margin:0;background:#f7faf9;color:#24464e;font-family:system-ui,sans-serif}main{padding:22px}h1{margin:0 0 6px;font-size:24px}p{font-size:13px;color:#648187;margin:0 0 18px}svg{display:block;width:100%;height:auto;border-radius:16px}button{border:0;border-radius:20px;padding:10px 18px;background:#315a65;color:white;margin-top:14px}pre{white-space:pre-wrap;font-size:12px}</style>`
 
+// Run inside the model's first script: a guard installed after the source is too late.
+const guardChecks = `
+  result.rtc = ['RTCPeerConnection', 'webkitRTCPeerConnection', 'mozRTCPeerConnection', 'RTCDataChannel', 'WebTransport'].every((key) => {
+    const property = Object.getOwnPropertyDescriptor(globalThis, key);
+    return property && property.value === undefined && !property.writable && !property.configurable;
+  });
+  result.modals = ['alert', 'confirm', 'prompt', 'print'].every((key) => {
+    const property = Object.getOwnPropertyDescriptor(globalThis, key);
+    return property && typeof property.value === 'function' && !property.writable && !property.configurable && property.value('drawing guard probe') === undefined;
+  });
+  result.guardLocked = !Reflect.set(globalThis, 'RTCPeerConnection', function Replacement() {});
+`
+
+export const SVG_ANIMATION = scene.replace('</svg>', `<script>
+const svg = document.getElementById('scene');
+const result = {};
+${guardChecks}
+svg.dataset.guards = JSON.stringify(result);
+svg.dataset.started = String(Date.now());
+let tick = 0;
+function ride() {
+  tick += 1;
+  svg.dataset.tick = String(tick);
+  document.getElementById('crank').setAttribute('transform', 'rotate(' + tick * 2 + ' 325 270)');
+  requestAnimationFrame(ride);
+}
+requestAnimationFrame(ride);
+</script></svg>`)
+
 export const HTML_ANIMATION = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">${style}</head><body><main><h1>沿着海风，慢慢骑。</h1><p>鹈鹕的海岸骑行 · HTML + SVG 动画</p>${scene}<button id="pause" onclick="window.paused = !window.paused">暂停 / 继续</button></main><script>
 document.documentElement.dataset.started = String(Date.now());
 let tick = 0;
@@ -40,9 +69,15 @@ wheel.setAttribute('cx','60'); wheel.setAttribute('cy','50'); wheel.setAttribute
 svg.appendChild(wheel); document.getElementById('canvas').appendChild(svg);
 </script></body></html>`
 
+export const HTML_BLOB_IMAGE = `<!doctype html><html><body><img id="blob-image" alt="本地生成图像"><script>
+const source = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="16"><rect width="24" height="16" fill="green"/></svg>';
+document.getElementById('blob-image').src = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml' }));
+</script></body></html>`
+
 export const HTML_HOSTILE = `<!doctype html><html><head>${style}</head><body><main><h1>隔离边界测试</h1><pre id="security-report">running</pre></main><script>
 (async () => {
   const result = {};
+  ${guardChecks}
   const blocked = (action) => { try { action(); return false; } catch { return true; } };
   result.parentDom = blocked(() => parent.document.body.setAttribute('data-escaped','yes'));
   result.parentStorage = blocked(() => parent.localStorage.getItem('drawing-sentinel'));
@@ -63,6 +98,8 @@ export const DRAWING_ANSWERS: Record<string, string> = {
   'mock-html-animation': `这是动画：\n\n\`\`\`html\n${HTML_ANIMATION}\n\`\`\``,
   'mock-html-css': HTML_CSS_ANIMATION,
   'mock-html-dynamic': HTML_DYNAMIC_SVG,
+  'mock-html-blob-image': HTML_BLOB_IMAGE,
   'mock-html-hostile': HTML_HOSTILE,
   'mock-html-truncated': HTML_TRUNCATED,
+  'mock-svg-animation': `\`\`\`svg\n${SVG_ANIMATION}\n\`\`\``,
 }

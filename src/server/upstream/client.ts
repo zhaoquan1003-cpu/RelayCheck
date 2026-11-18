@@ -11,6 +11,7 @@ export interface UpstreamProbeInput {
   model: string
   effort: Effort
   prompt?: string
+  drawingInstructions?: string
   imageDataUrl?: string
   maxAnswerBytes: number
   signal: AbortSignal
@@ -182,8 +183,9 @@ function buildRequest(input: UpstreamProbeInput): Record<string, unknown> {
       model: input.model,
       stream: true,
       store: false,
-      reasoning: { effort: input.effort },
-      input: [{ role: 'user', content }],
+      ...(input.drawingInstructions ? { instructions: input.drawingInstructions } : {}),
+      reasoning: { effort: input.effort, ...(input.drawingInstructions ? { summary: 'auto' } : {}) },
+      input: [{ ...(input.drawingInstructions ? { type: 'message' } : {}), role: 'user', content }],
     }
   }
 
@@ -192,7 +194,10 @@ function buildRequest(input: UpstreamProbeInput): Record<string, unknown> {
     model: input.model,
     stream: true,
     reasoning_effort: input.effort,
-    messages: [{ role: 'user', content }],
+    messages: [
+      ...(input.drawingInstructions ? [{ role: 'system', content: input.drawingInstructions }] : []),
+      { role: 'user', content },
+    ],
   }
 }
 

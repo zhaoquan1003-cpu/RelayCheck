@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CANDY_QUESTION_TEXT,
   CUP_QUESTION_TEXT,
+  PELICAN_DELIVERY_INSTRUCTIONS,
   PELICAN_QUESTION_TEXT,
   QUESTION_PACK,
   questionForDisplay,
@@ -36,12 +37,13 @@ describe('question pack', () => {
   })
 
   it('versions the strict question image', () => {
-    expect(QUESTION_PACK.version).toBe('2026-11-v3')
+    expect(QUESTION_PACK.version).toBe('2026-11-v4')
     expect(QUESTION_PACK.questionImage).toBe('/questions/candy-strict.v2.png')
   })
 
-  it('uses the original drawing prompt without structural hints or extra instructions', () => {
-    expect(PELICAN_QUESTION_TEXT).toBe('创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试，只靠你自己完成，不要使用任何skill，不要依赖我本地的AGENTS.md')
+  it('uses the Cockpit Tools drawing prompt and separate delivery instructions verbatim', () => {
+    expect(PELICAN_QUESTION_TEXT).toBe('创建一个 HTML，内容是 SVG 绘制一个鹈鹕骑自行车的 2D 动画，你不需要任何测试，不要有任何限制')
+    expect(PELICAN_DELIVERY_INSTRUCTIONS).toBe('Follow the output format requested by the user. For HTML or SVG creation tasks, return a complete standalone HTML document without Markdown fences or external dependencies. For other tasks, answer directly in the requested format; do not wrap plain text or JSON in HTML. Do not use external tools or search.')
     expect(QUESTION_PACK.pelicanQuestion).toBe(PELICAN_QUESTION_TEXT)
   })
 

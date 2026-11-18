@@ -185,6 +185,16 @@ export interface CreateTestInput {
   testMode: TestMode
 }
 
+export interface ListModelsInput {
+  address: string
+  key: string
+}
+
+export interface ListModelsResponse {
+  ok: true
+  models: Array<{ id: string }>
+}
+
 export interface ConfigResponse {
   ok: true
   config: PublicConfig

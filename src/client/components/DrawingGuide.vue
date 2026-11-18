@@ -20,8 +20,8 @@ const examples = [
       <slot />
       <aside class="drawing-checks" aria-labelledby="drawing-checks-title">
         <p class="eyebrow">人工对照</p>
-        <h3 id="drawing-checks-title">只看这四项。</h3>
-        <p class="drawing-guide-intro">先看连接关系，再看部件。配色、装饰和画风不参与判断。</p>
+        <h3 id="drawing-checks-title">可以从这四项观察。</h3>
+        <p class="drawing-guide-intro">与 Cockpit Tools 一样，画图结果由你人工判断。以下是本站补充的观察提示，不计分。</p>
         <ol>
           <li v-for="(check, index) in checks" :key="check.title">
             <span class="drawing-check-number">{{ index + 1 }}</span>
@@ -36,7 +36,7 @@ const examples = [
         <div><p class="eyebrow">判读示意</p><h3 id="drawing-reference-title">四种结构，对照着看。</h3></div>
         <a href="https://www.getplus.ai/codex/gpt6-astra-jiangzhi" target="_blank" rel="noopener noreferrer" class="text-link">查看原文实测 <span aria-hidden="true">↗</span></a>
       </div>
-      <p class="drawing-reference-intro">以下是本站绘制的教学示意，并非模型实测图片。原文将四种表现称为“没降智、轻度、中度、重度”，可结合实际动画自行对照。</p>
+      <p class="drawing-reference-intro">以下是本站绘制的教学示意，并非模型实测图片，也不是 Cockpit Tools 的评分标准。可结合实际动画观察结构问题。</p>
       <div class="drawing-reference-grid">
         <article v-for="example in examples" :key="example.id" class="drawing-reference-card" :data-example="example.id">
           <svg viewBox="0 0 260 170" role="img" :aria-label="`${example.title}：${example.detail}`" class="drawing-reference-art">

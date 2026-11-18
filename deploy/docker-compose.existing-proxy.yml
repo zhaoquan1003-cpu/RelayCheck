@@ -1,0 +1,11 @@
+# App-only deployment behind an existing host reverse proxy.
+# Start explicitly with: docker compose -p relaycheck --env-file .env \
+#   -f deploy/docker-compose.yml -f deploy/docker-compose.existing-proxy.yml up -d --build app
+services:
+  app:
+    image: relaycheck:${RELAYCHECK_TAG:-zhishang}
+    build:
+      args:
+        VITE_BASE_PATH: ${VITE_BASE_PATH:-/zhishang/}
+    ports:
+      - "127.0.0.1:${RELAYCHECK_PORT:-3101}:3000"

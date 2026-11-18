@@ -10,7 +10,7 @@ import type {
   TestSummary,
   Verdict,
 } from '../../shared/types'
-import { QUESTION_PACK } from '../../shared/questions'
+import { PELICAN_DELIVERY_INSTRUCTIONS, QUESTION_PACK } from '../../shared/questions'
 import { advancedVerdict, dualVerdict, pelicanVerdict, singleProbeVerdict } from '../../shared/verdict'
 import type { AppConfig } from '../config'
 import type { TestRepository } from '../db/repository'
@@ -283,6 +283,7 @@ export class TestJobRunner {
               model: job.model,
               effort: job.effort,
               prompt: probe.imageOnly ? undefined : probe.prompt,
+              drawingInstructions: probe.kind === 'pelican' ? PELICAN_DELIVERY_INSTRUCTIONS : undefined,
               imageDataUrl: probe.imageOnly ? getQuestionImageDataUrl() : undefined,
               maxAnswerBytes: this.config.MAX_ANSWER_BYTES,
               signal: controller.signal,

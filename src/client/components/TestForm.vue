@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ApiType, CreateTestInput, Effort, PublicConfig, TestMode } from '../../shared/types'
 import { questionForDisplay } from '../../shared/questions'
+import { appPath } from '../lib/paths'
+import { api, ApiError } from '../lib/api'
 import MarkdownContent from './MarkdownContent.vue'
 
 const props = defineProps<{
@@ -19,6 +21,11 @@ const apiKey = ref('')
 const showKey = ref(false)
 const modelChoice = ref(props.config.models[0]?.id || 'gpt-6-astra')
 const customModel = ref('')
+const fetchedModels = ref<Array<{ id: string }> | null>(null)
+const fetchingModels = ref(false)
+const modelsMessage = ref('')
+const modelsError = ref(false)
+let modelsController: AbortController | null = null
 
 const modeIcons: Record<TestMode, string> = {
   dual: 'M8 4H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3M16 4h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3M10 7l-3 4 3 4m4-8 3 4-3 4',
@@ -42,7 +49,61 @@ watch(
 )
 
 const custom = computed(() => modelChoice.value === 'custom')
-const model = computed(() => (custom.value ? customModel.value.trim() : modelChoice.value))
+const model = computed(() => custom.value
+  ? customModel.value.trim()
+  : modelChoice.value.startsWith('upstream:') ? modelChoice.value.slice('upstream:'.length) : modelChoice.value)
+const modelOptions = computed(() => fetchedModels.value?.length
+  ? [...fetchedModels.value.map(({ id }) => ({ id: `upstream:${id}`, label: id })), { id: 'custom', label: '自定义模型' }]
+  : props.config.models)
+const canFetchModels = computed(() => !fetchingModels.value && !props.busy && Boolean(address.value.trim()) && Boolean(apiKey.value.trim()))
+
+watch([address, apiKey], () => {
+  modelsController?.abort()
+  modelsController = null
+  fetchingModels.value = false
+  fetchedModels.value = null
+  modelsMessage.value = ''
+  modelsError.value = false
+  if (modelChoice.value.startsWith('upstream:')) {
+    modelChoice.value = props.config.models[0]?.id || 'custom'
+  }
+}, { flush: 'sync' })
+
+onBeforeUnmount(() => modelsController?.abort())
+
+async function fetchModels() {
+  if (!canFetchModels.value) return
+  const controller = new AbortController()
+  modelsController = controller
+  fetchingModels.value = true
+  modelsMessage.value = ''
+  modelsError.value = false
+  try {
+    const result = await api.listModels({ address: address.value.trim(), key: apiKey.value.trim() }, controller.signal)
+    if (modelsController !== controller) return
+    const currentModel = model.value
+    fetchedModels.value = result.models
+    if (result.models.length) {
+      const selected = result.models.find((item) => item.id === currentModel) || result.models[0]
+      modelChoice.value = `upstream:${selected.id}`
+      modelsMessage.value = `已获取 ${result.models.length} 个模型，请选择要测试的模型。`
+    } else {
+      if (modelChoice.value.startsWith('upstream:')) modelChoice.value = props.config.models[0]?.id || 'custom'
+      modelsMessage.value = '中转未返回可用模型，可选择预设或填写自定义模型 ID。'
+    }
+  } catch (error) {
+    if (modelsController !== controller) return
+    modelsError.value = true
+    modelsMessage.value = error instanceof ApiError
+      ? `${error.message}；可重试或填写自定义模型 ID。`
+      : '获取模型失败，请检查连接后重试，或填写自定义模型 ID。'
+  } finally {
+    if (modelsController === controller) {
+      modelsController = null
+      fetchingModels.value = false
+    }
+  }
+}
 const modeMeta = computed(() => props.config.modes.find((item) => item.id === mode.value) || props.config.modes[0])
 const apiMeta = computed(() => props.config.apiTypes.find((item) => item.id === apiType.value))
 const strictImage = computed(() => mode.value === 'strict' || mode.value === 'dual')
@@ -61,7 +122,7 @@ const questionPreview = computed(() => {
   return questionForDisplay(text)
 })
 const canSubmit = computed(
-  () => !props.busy && Boolean(address.value.trim()) && Boolean(apiKey.value.trim()) && Boolean(model.value),
+  () => !props.busy && !fetchingModels.value && Boolean(address.value.trim()) && Boolean(apiKey.value.trim()) && Boolean(model.value),
 )
 
 function setMode(next: TestMode) {
@@ -119,12 +180,48 @@ defineExpose({ clearKey })
         <p class="field-help">{{ modeMeta?.help }}</p>
       </fieldset>
 
+      <label class="field address-field">
+        <span>中转地址</span>
+        <input id="upstream-address" v-model="address" type="text" inputmode="url" maxlength="2048" placeholder="https://your-relay.example.com" autocomplete="off" required />
+        <small class="field-description">填写目标中转的 OpenAI 兼容地址。</small>
+      </label>
+
+      <div class="field">
+        <label for="api-key">API Key</label>
+        <div class="key-input">
+          <input
+            id="api-key"
+            v-model="apiKey"
+            :type="showKey ? 'text' : 'password'"
+            placeholder="sk-…"
+            autocomplete="off"
+            spellcheck="false"
+            maxlength="4096"
+            required
+          />
+          <button type="button" class="key-visibility" :aria-pressed="showKey" @click="showKey = !showKey">
+            {{ showKey ? '隐藏' : '显示' }}
+          </button>
+        </div>
+        <small class="field-description">仅用于本次请求，记录中只保存脱敏信息。</small>
+      </div>
+
       <div class="settings-group">
+        <div class="model-fetch-row">
+          <p class="field-description">填写中转地址和 API Key 后，获取可用模型。</p>
+          <button type="button" class="secondary model-fetch-button" :disabled="!canFetchModels" :aria-busy="fetchingModels" @click="fetchModels">
+            <span v-if="fetchingModels" class="button-spinner" aria-hidden="true" />
+            {{ fetchingModels ? '正在获取…' : '获取模型' }}
+          </button>
+        </div>
+        <p v-if="modelsMessage" class="model-fetch-message" :class="{ 'is-error': modelsError }" :role="modelsError ? 'alert' : 'status'">
+          {{ modelsMessage }}
+        </p>
         <div class="form-row two">
           <label class="field">
             <span>测试模型</span>
-            <select v-model="modelChoice">
-              <option v-for="preset in config.models" :key="preset.id" :value="preset.id">
+            <select id="test-model" v-model="modelChoice" :disabled="fetchingModels">
+              <option v-for="preset in modelOptions" :key="preset.id" :value="preset.id">
                 {{ preset.label }}
               </option>
             </select>
@@ -156,36 +253,10 @@ defineExpose({ clearKey })
         </div>
       </div>
 
-      <label class="field address-field">
-        <span>中转地址</span>
-        <input v-model="address" type="text" inputmode="url" maxlength="2048" placeholder="https://your-relay.example.com" autocomplete="off" required />
-        <small class="field-description">填写目标中转的 OpenAI 兼容地址。</small>
-      </label>
-
-      <div class="field">
-        <label for="api-key">API Key</label>
-        <div class="key-input">
-          <input
-            id="api-key"
-            v-model="apiKey"
-            :type="showKey ? 'text' : 'password'"
-            placeholder="sk-…"
-            autocomplete="off"
-            spellcheck="false"
-            maxlength="4096"
-            required
-          />
-          <button type="button" class="key-visibility" :aria-pressed="showKey" @click="showKey = !showKey">
-            {{ showKey ? '隐藏' : '显示' }}
-          </button>
-        </div>
-        <small class="field-description">仅用于本次请求，记录中只保存脱敏信息。</small>
-      </div>
-
       <details class="question-preview">
         <summary><span>查看本次发送的题目</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg></summary>
         <div v-if="strictImage" class="strict-image-wrap">
-          <img :src="config.questions.questionImage" alt="严格模式发送给模型的糖果题原图" />
+          <img :src="appPath(config.questions.questionImage)" alt="严格模式发送给模型的糖果题原图" />
           <p class="fine-print">严格模式只发送图片，不附加文字题面或提示词。</p>
         </div>
         <MarkdownContent :source="questionPreview" />

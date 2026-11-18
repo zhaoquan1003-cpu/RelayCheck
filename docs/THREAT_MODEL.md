@@ -42,7 +42,7 @@
 - Admission includes pending validation and queued work, with reservations made before asynchronous DNS. Proxy trust defaults off; explicitly configured hop counts require network isolation of the backend.
 - SSE also has a global cap, backpressure disconnects, socket timeouts and bounded shutdown. Client summaries avoid repeatedly transferring full answers.
 - 32 KB request body, URL/key/model length caps.
-- 300 s total test timeout, 2 MB answer cap, 512 KiB HTML/SVG preview cap for the drawing mode, 30 s headers timeout. HTML format checks use an HTML parser and iterative tree traversal to tolerate deep model output without recursive stack exhaustion.
+- Configurable total test timeout (default 300 s) and UTF-8 answer cap (default 2 MiB), a fixed 512 KiB HTML/SVG preview cap for the drawing mode, and a 30 s headers timeout. Preview extraction requires a complete HTML or SVG root and does not repair generated markup. These hosting limits deliberately differ from the reference implementation; see [drawing behavior](DRAWING.md).
 - No automatic retries.
 - Admin can delete terminal records; retention runs at completion and hourly, preserving active records.
 - Single instance: a determined attacker can still consume the global queue. Add a WAF/reverse-proxy auth or Cloudflare in front for public deployments.
@@ -51,12 +51,12 @@
 
 - Model output is rendered with `html: false`, image syntax disabled, DOMPurify, KaTeX with `trust: false`.
 - Large answers use escaped plain text instead of expensive Markdown/math parsing.
-- SVG drawing answers are sanitized with the DOMPurify SVG profile (no `script`, `foreignObject`, or `style`, fragment-only URIs) and rendered as a `data:` URI inside an `<img>`, never inline, so model markup cannot execute script or fetch external resources.
-- HTML drawing answers intentionally execute their own inline CSS/JavaScript only through the dedicated `/api/v1/tests/:id/preview` response. Both the HTTP CSP and iframe enforce `sandbox allow-scripts` without same-origin privileges. The frame cannot access parent DOM/storage, open popups, navigate the top page or submit forms. CSP blocks connections, external resources, workers and nested frames; the app's normal CSP is unchanged. Preview responses are no-store/no-referrer and SAMEORIGIN framed. Opening the preview URL directly retains the HTTP sandbox.
+- HTML and standalone SVG drawing answers intentionally execute their own inline CSS/JavaScript through the same dedicated `/api/v1/tests/:id/preview` response. Generated markup is not inserted into the host DOM or sanitized into a static image, so animation scripts and controls remain available. Existing credential redaction still applies before source is stored.
+- Both the HTTP CSP and iframe enforce `sandbox allow-scripts` without same-origin privileges. The frame cannot access parent DOM/storage, open popups, navigate the top page or submit forms. CSP blocks external resources/connections, workers and nested frames, while permitting inline code, `data:` / `blob:` images and `data:` fonts. A preview-only wrapper runs before generated code to lock down RTC/WebTransport constructors and replace modal APIs (`alert`, `confirm`, `prompt`, `print`) with no-ops. It does not rewrite the stored source or repair the drawing. The app's normal CSP is unchanged. Preview responses are no-store/no-referrer and SAMEORIGIN framed. Opening the preview URL directly retains the HTTP sandbox.
 - The drawing sandbox is a browser boundary, not a code correctness or resource-usage guarantee: scripts can still consume CPU or navigate their own frame. No claim of completely eliminating all possible network activity is made. Previews are mounted only for completed records while their detail is open, and are removed on stop/close. Generated code is never evaluated on the server or injected into the main document; source is escaped text. Preview failures and format problems are not model-quality verdicts.
 - Links get `noopener noreferrer`.
-- The page never executes model output.
-- The prompt asks the model not to use tools, but that is not a security control.
+- The main app document never executes model output; drawing code runs only in the isolated preview.
+- Drawing requests include delivery instructions asking the model not to use tools; the app supplies no tools and performs no model fallback or automatic generation retry. The instruction itself is not a security control over the upstream provider.
 - CSP is set by Helmet; the `/zhishang`-style separate app is not used here.
 
 ### Data exposure

@@ -26,9 +26,10 @@ export const CUP_QUESTION_TEXT = `有一个水杯配对游戏。共有 4 种不�
 回答时请不要进行联网搜索，也不要写代码来辅助计算(包括思考过程中)。
 假设答案是 x ，你需要给出严格的证明，为什么 x 可行，为什么小于 x 不可行。`
 
-// Keep the reference prompt verbatim; explaining the four checks would change the test.
-// https://www.getplus.ai/codex/gpt6-astra-jiangzhi
-export const PELICAN_QUESTION_TEXT = '创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试，只靠你自己完成，不要使用任何skill，不要依赖我本地的AGENTS.md'
+// Keep both the prompt and delivery instructions aligned with Cockpit Tools.
+// https://github.com/jlcodes99/cockpit-tools/tree/27a4a7e87f214acdea52ad58bb6d3141671ed6d0
+export const PELICAN_QUESTION_TEXT = '创建一个 HTML，内容是 SVG 绘制一个鹈鹕骑自行车的 2D 动画，你不需要任何测试，不要有任何限制'
+export const PELICAN_DELIVERY_INSTRUCTIONS = 'Follow the output format requested by the user. For HTML or SVG creation tasks, return a complete standalone HTML document without Markdown fences or external dependencies. For other tasks, answer directly in the requested format; do not wrap plain text or JSON in HTML. Do not use external tools or search.'
 
 /**
  * 基准原题的表格缺少 Markdown 表头分隔行；模型请求保持原样，
@@ -43,7 +44,7 @@ export function questionForDisplay(text: string | null | undefined): string {
 
 export const QUESTION_PACK: QuestionPack = {
   id: 'relaycheck-core',
-  version: '2026-11-v3',
+  version: '2026-11-v4',
   question: CANDY_QUESTION_TEXT,
   cupQuestion: CUP_QUESTION_TEXT,
   pelicanQuestion: PELICAN_QUESTION_TEXT,

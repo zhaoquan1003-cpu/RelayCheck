@@ -5,9 +5,12 @@ import type {
   CreateTestResponse,
   GetTestResponse,
   ListTestsResponse,
+  ListModelsInput,
+  ListModelsResponse,
   TestDetail,
   TestSummary,
 } from '../../shared/types'
+import { appPath } from './paths'
 
 export class ApiError extends Error {
   readonly status: number
@@ -24,7 +27,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/v1${path}`, {
+  const response = await fetch(appPath(`api/v1${path}`), {
     ...init,
     signal: init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000),
     headers: {
@@ -53,6 +56,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getConfig: () => request<ConfigResponse>('/config'),
+  listModels: (input: ListModelsInput, signal?: AbortSignal) =>
+    request<ListModelsResponse>('/models', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      signal,
+    }),
   listTests: (page: number, signal?: AbortSignal) => request<ListTestsResponse>(`/tests?page=${Math.max(1, page)}`, { signal }),
   getSummaries: (ids: string[], signal?: AbortSignal) => request<{ ok: true; records: TestSummary[]; missingIds: string[] }>(
     `/tests/summaries?ids=${encodeURIComponent(ids.join(','))}`, { signal },

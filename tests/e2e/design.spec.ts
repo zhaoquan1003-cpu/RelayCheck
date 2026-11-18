@@ -108,7 +108,7 @@ test('all rich detail layouts remain readable on desktop and mobile', async ({ p
   for (const mode of [
     { id: 'dual', model: 'mock-pass', content: '.dual-grid' },
     { id: 'advanced', model: 'mock-advanced', content: '.fingerprint-panel' },
-    { id: 'pelican', model: 'mock-svg', content: '[data-testid="svg-preview"]' },
+    { id: 'pelican', model: 'mock-svg', content: '[data-testid="drawing-preview"]' },
   ]) {
     const response = await request.post('/api/v1/tests', { data: {
       address: 'http://127.0.0.1:3199', key: 'apple-rich-detail-test-key',
