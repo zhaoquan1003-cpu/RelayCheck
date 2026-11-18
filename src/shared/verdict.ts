@@ -1,5 +1,5 @@
 import type { Fingerprint, TestMode, Verdict } from './types'
-import { MAX_SVG_BYTES, extractSvgMarkup, inspectSvg } from './svg-art'
+import { drawingArtifactMessage, extractDrawingArtifact } from './drawing-art'
 
 export interface VerdictDecision {
   verdict: Verdict
@@ -109,44 +109,15 @@ export function modeLabel(mode: TestMode): string {
     case 'cup':
       return '水杯题'
     case 'pelican':
-      return 'SVG 画图题（鹈鹕骑自行车）'
+      return '画图检测（鹈鹕骑自行车动画）'
     case 'advanced':
       return 'ModelTrace 指纹'
   }
 }
 
 export function pelicanVerdict(answer: string): VerdictDecision {
-  const extraction = extractSvgMarkup(answer)
-  if (extraction.tooLarge) {
-    return {
-      verdict: 'fail',
-      reason: `返回的 SVG 超过 ${Math.round(MAX_SVG_BYTES / 1024)} KB，无法安全渲染，画图题未通过。`,
-    }
-  }
-  if (!extraction.markup) {
-    return {
-      verdict: 'fail',
-      reason: '回答里没有找到完整的 <svg> 代码，画图题未通过。',
-    }
-  }
-  const inspection = inspectSvg(extraction.markup)
-  if (!inspection.complete) {
-    return {
-      verdict: 'fail',
-      reason: '返回的 <svg> 缺少根元素或闭合标签，画图题未通过。',
-    }
-  }
-  if (inspection.elements < 2) {
-    return {
-      verdict: 'fail',
-      reason: `返回的 SVG 只有 ${inspection.elements} 个图形元素，几乎没有可判读的内容，画图题未通过。`,
-    }
-  }
-  const filtered = inspection.risky.length
-    ? `；已过滤 ${inspection.risky.join('、')}`
-    : ''
   return {
     verdict: 'unknown',
-    reason: `已返回 SVG（${inspection.elements} 个图形元素、${inspection.paths} 条路径），渲染效果需要人工判读画功${filtered}。`,
+    reason: drawingArtifactMessage(extractDrawingArtifact(answer)),
   }
 }

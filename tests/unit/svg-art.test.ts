@@ -63,27 +63,27 @@ describe('pelicanVerdict', () => {
   it('accepts a structurally valid drawing as manual review', () => {
     const decision = pelicanVerdict('```svg\n' + GOOD_SVG + '\n```')
     expect(decision.verdict).toBe('unknown')
-    expect(decision.reason).toContain('3 个图形元素')
+    expect(decision.reason).toContain('兼容图片预览')
     expect(decision.reason).toContain('人工判读')
   })
 
-  it('fails when the model returns no SVG', () => {
+  it('keeps missing drawings neutral rather than inferring model quality', () => {
     const decision = pelicanVerdict('抱歉，我只能输出文字。')
-    expect(decision.verdict).toBe('fail')
+    expect(decision.verdict).toBe('unknown')
     expect(decision.reason).toContain('没有找到')
   })
 
-  it('fails an empty SVG', () => {
+  it('does not infer model quality from SVG element counts', () => {
     const decision = pelicanVerdict('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
-    expect(decision.verdict).toBe('fail')
-    expect(decision.reason).toContain('图形元素')
+    expect(decision.verdict).toBe('unknown')
+    expect(decision.reason).toContain('人工判读')
   })
 
-  it('mentions filtered risky content for hostile drawings', () => {
+  it('leaves legacy SVG safety to the isolated image renderer', () => {
     const decision = pelicanVerdict(
       '<svg><script>alert(1)</script><circle cx="1" cy="1" r="1"/><path d="M0 0 L1 1"/></svg>',
     )
     expect(decision.verdict).toBe('unknown')
-    expect(decision.reason).toContain('已过滤')
+    expect(decision.reason).toContain('兼容图片预览')
   })
 })

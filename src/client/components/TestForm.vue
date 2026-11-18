@@ -30,7 +30,7 @@ const modeIcons: Record<TestMode, string> = {
 }
 const modeDescriptions: Record<TestMode, string> = {
   dual: '文字与图片对照', strict: '检查视觉理解', quick: '基础推理检测',
-  cup: '检验逻辑推理', pelican: '看看模型的画功', advanced: '比对模型指纹',
+  cup: '检验逻辑推理', pelican: '观察骑行动画结构', advanced: '比对模型指纹',
 }
 
 watch(

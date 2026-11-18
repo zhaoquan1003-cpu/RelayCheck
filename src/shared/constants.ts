@@ -35,9 +35,9 @@ export const TEST_MODE_META: TestModeMeta[] = [
   },
   {
     id: 'pelican',
-    label: '快速测试 · SVG 画图题（鹈鹕骑自行车）',
+    label: '画图检测 · 鹈鹕骑自行车动画',
     short: '画图',
-    help: '让目标模型画一只骑自行车的鹈鹕，并且只输出 SVG。拿到完整可渲染的 SVG 后由你人工判读画功；没有有效 SVG 会判为未通过。',
+    help: '使用固定原题生成 HTML + SVG 骑行动画。打开结果，按车轮、腿与脚踏、视角和鹈鹕喙四项对照判读；单次结果不作模型降智的确定结论。',
   },
   {
     id: 'advanced',

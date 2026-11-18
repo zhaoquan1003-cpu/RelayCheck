@@ -11,7 +11,7 @@ export function modeLabel(mode: TestMode): string {
     case 'cup':
       return '水杯题'
     case 'pelican':
-      return 'SVG 画图题（鹈鹕骑自行车）'
+      return '画图题（鹈鹕骑自行车）'
     case 'advanced':
       return 'ModelTrace 指纹'
   }
@@ -34,10 +34,11 @@ export function modeShort(mode: TestMode): string {
   }
 }
 
-export function verdictLabel(test: Pick<TestSummary, 'status' | 'verdict'>): string {
+export function verdictLabel(test: Pick<TestSummary, 'status' | 'verdict'> & Partial<Pick<TestSummary, 'testMode'>>): string {
   if (test.status === 'queued') return '排队中'
   if (test.status === 'running') return '测试中'
   if (test.status === 'failed') return '测试失败'
+  if (test.testMode === 'pelican') return test.verdict === 'fail' ? '输出异常' : '待人工判读'
   switch (test.verdict) {
     case 'pass':
       return '不降智'

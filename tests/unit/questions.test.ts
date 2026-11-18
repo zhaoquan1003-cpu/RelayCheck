@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CANDY_QUESTION_TEXT,
   CUP_QUESTION_TEXT,
+  PELICAN_QUESTION_TEXT,
   QUESTION_PACK,
   questionForDisplay,
 } from '../../src/shared/questions'
@@ -35,8 +36,13 @@ describe('question pack', () => {
   })
 
   it('versions the strict question image', () => {
-    expect(QUESTION_PACK.version).toBe('2026-11-v2')
+    expect(QUESTION_PACK.version).toBe('2026-11-v3')
     expect(QUESTION_PACK.questionImage).toBe('/questions/candy-strict.v2.png')
+  })
+
+  it('uses the original drawing prompt without structural hints or extra instructions', () => {
+    expect(PELICAN_QUESTION_TEXT).toBe('创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试，只靠你自己完成，不要使用任何skill，不要依赖我本地的AGENTS.md')
+    expect(QUESTION_PACK.pelicanQuestion).toBe(PELICAN_QUESTION_TEXT)
   })
 
   it('adds the markdown table separator for display only, idempotently', () => {

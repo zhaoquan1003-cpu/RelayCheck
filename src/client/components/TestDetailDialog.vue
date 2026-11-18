@@ -6,7 +6,8 @@ import { questionForDisplay } from '../../shared/questions'
 import FingerprintPanel from './FingerprintPanel.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import StatusBadge from './StatusBadge.vue'
-import SvgArtPreview from './SvgArtPreview.vue'
+import DrawingArtPreview from './DrawingArtPreview.vue'
+import DrawingGuide from './DrawingGuide.vue'
 
 const props = defineProps<{
   open: boolean
@@ -83,13 +84,13 @@ function probeLabel(kind: string) {
   if (kind === 'quick') return '旧文字题'
   if (kind === 'strict') return '严格原图题'
   if (kind === 'cup') return '水杯题'
-  if (kind === 'pelican') return 'SVG 画图题'
+  if (kind === 'pelican') return '骑行动画题'
   return '指纹题'
 }
 </script>
 
 <template>
-  <dialog ref="dialogEl" class="detail-dialog" aria-labelledby="detail-title" @close="onDialogClose" @cancel="onCancel" @click="onBackdrop">
+  <dialog ref="dialogEl" class="detail-dialog" :class="{ 'drawing-dialog': isPelican }" aria-labelledby="detail-title" @close="onDialogClose" @cancel="onCancel" @click="onBackdrop">
     <div v-if="test" class="dialog-card" @click.stop>
       <header class="dialog-header">
         <div class="dialog-heading">
@@ -101,7 +102,7 @@ function probeLabel(kind: string) {
           </p>
         </div>
         <div class="dialog-header-actions">
-          <StatusBadge :status="test.status" :verdict="test.verdict" />
+          <StatusBadge :status="test.status" :verdict="test.verdict" :test-mode="test.testMode" />
           <button class="icon-button" type="button" aria-label="关闭详情" @click="close">
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg>
           </button>
@@ -154,14 +155,11 @@ function probeLabel(kind: string) {
           </article>
         </section>
 
+        <DrawingGuide v-else-if="isPelican">
+          <DrawingArtPreview v-if="open" :key="test.id" :test-id="test.id" :status="test.status" :source="test.answer" />
+        </DrawingGuide>
+
         <section v-else-if="isSingle" class="answer-section">
-          <template v-if="isPelican">
-            <h3>渲染结果（人工判读）</h3>
-            <SvgArtPreview :source="test.answer" />
-            <p class="fine-print">
-              模型生成的 SVG 以隔离图片方式渲染，画得像不像需要你人工判断；自动判定只看结构。
-            </p>
-          </template>
           <h3>回答正文</h3>
           <MarkdownContent :source="test.answer || (test.status === 'running' ? '后台测试进行中…' : '没有回答正文')" />
         </section>
@@ -201,7 +199,7 @@ function probeLabel(kind: string) {
         </details>
 
         <details class="raw-section">
-          <summary>查看原始 Markdown</summary>
+          <summary>{{ isPelican ? '查看回答源码' : '查看原始 Markdown' }}</summary>
           <pre class="raw-pre">{{ rawAnswer }}</pre>
         </details>
 

@@ -42,7 +42,7 @@
 - Admission includes pending validation and queued work, with reservations made before asynchronous DNS. Proxy trust defaults off; explicitly configured hop counts require network isolation of the backend.
 - SSE also has a global cap, backpressure disconnects, socket timeouts and bounded shutdown. Client summaries avoid repeatedly transferring full answers.
 - 32 KB request body, URL/key/model length caps.
-- 300 s total test timeout, 2 MB answer cap, 512 KB SVG parsing cap for the drawing mode, 30 s headers timeout.
+- 300 s total test timeout, 2 MB answer cap, 512 KiB HTML/SVG preview cap for the drawing mode, 30 s headers timeout. HTML format checks use an HTML parser and iterative tree traversal to tolerate deep model output without recursive stack exhaustion.
 - No automatic retries.
 - Admin can delete terminal records; retention runs at completion and hourly, preserving active records.
 - Single instance: a determined attacker can still consume the global queue. Add a WAF/reverse-proxy auth or Cloudflare in front for public deployments.
@@ -52,6 +52,8 @@
 - Model output is rendered with `html: false`, image syntax disabled, DOMPurify, KaTeX with `trust: false`.
 - Large answers use escaped plain text instead of expensive Markdown/math parsing.
 - SVG drawing answers are sanitized with the DOMPurify SVG profile (no `script`, `foreignObject`, or `style`, fragment-only URIs) and rendered as a `data:` URI inside an `<img>`, never inline, so model markup cannot execute script or fetch external resources.
+- HTML drawing answers intentionally execute their own inline CSS/JavaScript only through the dedicated `/api/v1/tests/:id/preview` response. Both the HTTP CSP and iframe enforce `sandbox allow-scripts` without same-origin privileges. The frame cannot access parent DOM/storage, open popups, navigate the top page or submit forms. CSP blocks connections, external resources, workers and nested frames; the app's normal CSP is unchanged. Preview responses are no-store/no-referrer and SAMEORIGIN framed. Opening the preview URL directly retains the HTTP sandbox.
+- The drawing sandbox is a browser boundary, not a code correctness or resource-usage guarantee: scripts can still consume CPU or navigate their own frame. No claim of completely eliminating all possible network activity is made. Previews are mounted only for completed records while their detail is open, and are removed on stop/close. Generated code is never evaluated on the server or injected into the main document; source is escaped text. Preview failures and format problems are not model-quality verdicts.
 - Links get `noopener noreferrer`.
 - The page never executes model output.
 - The prompt asks the model not to use tools, but that is not a security control.

@@ -8,6 +8,7 @@ import type { SseConnectionLimiter } from '../services/rate-limit'
 import { openSse } from '../services/sse-hub'
 import { PAGE_SIZE, API_TYPE_META, DISCLAIMERS, EFFORT_META, MODEL_PRESETS, TEST_MODE_META } from '../../shared/constants'
 import { QUESTION_PACK } from '../../shared/questions'
+import { extractDrawingArtifact, MAX_DRAWING_BYTES } from '../../shared/drawing-art'
 import { createTestSchema } from './schemas'
 
 const ID_RE = /^[a-f0-9]{16}$/
@@ -92,6 +93,54 @@ export function registerPublicRoutes(
     const test = repository.getDetail(id)
     if (!test) throw new HttpError(404, 'NOT_FOUND', 'not found')
     return { ok: true, test }
+  })
+
+  app.get('/api/v1/tests/:id/preview', {
+    config: { rateLimit: { max: config.LIST_PER_MINUTE, timeWindow: '1 minute' } },
+    // Replace the main page's policy only for the isolated generated document.
+    // The HTTP sandbox also applies when this URL is opened outside an iframe.
+    helmet: {
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          sandbox: ['allow-scripts'],
+          defaultSrc: ["'none'"],
+          scriptSrc: ["'unsafe-inline'"],
+          styleSrc: ["'unsafe-inline'"],
+          imgSrc: ['data:'],
+          fontSrc: ['data:'],
+          connectSrc: ["'none'"],
+          objectSrc: ["'none'"],
+          frameSrc: ["'none'"],
+          workerSrc: ["'none'"],
+          baseUri: ["'none'"],
+          formAction: ["'none'"],
+          frameAncestors: ["'self'"],
+        },
+      },
+      xFrameOptions: { action: 'sameorigin' },
+      referrerPolicy: { policy: 'no-referrer' },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    if (!ID_RE.test(id)) throw new HttpError(404, 'NOT_FOUND', 'not found')
+    const test = repository.getDetail(id)
+    if (!test || test.testMode !== 'pelican') throw new HttpError(404, 'NOT_FOUND', 'not found')
+    if (test.status !== 'completed') {
+      throw new HttpError(409, 'PREVIEW_NOT_READY', '画图检测尚未成功完成，暂不能预览。')
+    }
+    const artifact = extractDrawingArtifact(test.answer)
+    if (artifact.kind !== 'html' || !artifact.source) {
+      const message = artifact.error === 'too_large'
+        ? `预览产物超过 ${MAX_DRAWING_BYTES / 1024} KiB，请查看原始回答。`
+        : artifact.error === 'incomplete'
+          ? 'HTML 产物不完整，请查看原始回答。'
+          : artifact.kind === 'svg'
+            ? '此记录为独立 SVG，请使用图片预览。'
+            : '回答中没有可预览的 HTML，请查看原始回答。'
+      throw new HttpError(422, 'PREVIEW_UNAVAILABLE', message)
+    }
+    return reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(artifact.source)
   })
 
   app.get('/api/v1/tests/:id/events', {

@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
+import { DRAWING_ANSWERS } from './fixtures/drawing-answers'
 
 export interface MockRequest {
   path: string
@@ -27,6 +28,7 @@ function textFromRequest(body: Record<string, unknown>): string {
 }
 
 function mockAnswer(body: Record<string, unknown>, model: string): string {
+  if (DRAWING_ANSWERS[model]) return DRAWING_ANSWERS[model]
   if (model === 'mock-fail') return '0'
   if (model === 'mock-degraded') {
     // Reproduces the answer a weaker backend gave through the user's relay:

@@ -41,7 +41,7 @@ describe('RelayCheck API integration', () => {
     expect(configJson.config.modes).toHaveLength(6)
     expect(configJson.config.questions.candyAnswer).toBe(21)
     expect(configJson.config.questions.pelicanQuestion).toContain('鹈鹕')
-    expect(configJson.config.questions.version).toBe('2026-11-v2')
+    expect(configJson.config.questions.version).toBe('2026-11-v3')
     expect(configJson.config.questions.questionImage).toBe('/questions/candy-strict.v2.png')
     expect(configJson.config.questions.question).toContain('在活动前决定摸出的糖果数目')
     expect(configJson.config.questions.question).not.toContain('自行决定取多少颗圆形')
@@ -136,14 +136,14 @@ describe('RelayCheck API integration', () => {
     expect(test.status).toBe('completed')
     expect(test.verdict).toBe('unknown')
     expect(test.answer).toContain('<svg')
-    expect(test.verdictReason).toContain('图形元素')
+    expect(test.verdictReason).toContain('人工判读')
     expect(test.probes).toHaveLength(1)
     expect(test.probes[0].kind).toBe('pelican')
     const sent = JSON.stringify(context.mock.requests[context.mock.requests.length - 1]?.body)
     expect(sent).toContain('鹈鹕')
   })
 
-  it('marks a pelican answer without SVG as a completed fail', async () => {
+  it('keeps a drawing without an artifact neutral and explains the format problem', async () => {
     const created = await postTest(context.base, {
       address: context.mock.url,
       key: KEY,
@@ -154,7 +154,7 @@ describe('RelayCheck API integration', () => {
     })
     const test = await waitForTerminal(context.base, created.json.test.id)
     expect(test.status).toBe('completed')
-    expect(test.verdict).toBe('fail')
+    expect(test.verdict).toBe('unknown')
     expect(test.verdictReason).toContain('没有找到')
   })
 

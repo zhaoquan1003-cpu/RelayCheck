@@ -96,8 +96,7 @@ test('pelican mode renders the model SVG in an isolated preview', async ({ page 
 
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  await expect(dialog.locator('.badge').first()).toContainText('无法判定')
-  await expect(dialog).toContainText('渲染结果（人工判读）')
+  await expect(dialog.locator('.badge').first()).toContainText('待人工判读')
   const preview = dialog.getByTestId('svg-preview')
   await expect(preview).toBeVisible()
   await expect(preview).toHaveAttribute('src', /^data:image\/svg\+xml/)

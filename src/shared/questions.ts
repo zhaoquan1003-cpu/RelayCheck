@@ -26,13 +26,9 @@ export const CUP_QUESTION_TEXT = `有一个水杯配对游戏。共有 4 种不�
 回答时请不要进行联网搜索，也不要写代码来辅助计算(包括思考过程中)。
 假设答案是 x ，你需要给出严格的证明，为什么 x 可行，为什么小于 x 不可行。`
 
-export const PELICAN_QUESTION_TEXT = `请画一只骑自行车的鹈鹕，并且只输出 SVG 代码，不要输出任何解释。
-
-要求：
-- 使用单个 <svg> 根元素，写明 viewBox 和 xmlns="http://www.w3.org/2000/svg"
-- 画面里要能看出：鹈鹕（大喙、喉囊）和自行车（两个轮子、车把、踏板），鹈鹕坐在车上踩踏板
-- 不要使用外部图片、字体、脚本、事件属性、<foreignObject> 或任何外部链接
-- 答案必须是一个可以直接渲染的完整 SVG`
+// Keep the reference prompt verbatim; explaining the four checks would change the test.
+// https://www.getplus.ai/codex/gpt6-astra-jiangzhi
+export const PELICAN_QUESTION_TEXT = '创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试，只靠你自己完成，不要使用任何skill，不要依赖我本地的AGENTS.md'
 
 /**
  * 基准原题的表格缺少 Markdown 表头分隔行；模型请求保持原样，
@@ -47,7 +43,7 @@ export function questionForDisplay(text: string | null | undefined): string {
 
 export const QUESTION_PACK: QuestionPack = {
   id: 'relaycheck-core',
-  version: '2026-11-v2',
+  version: '2026-11-v3',
   question: CANDY_QUESTION_TEXT,
   cupQuestion: CUP_QUESTION_TEXT,
   pelicanQuestion: PELICAN_QUESTION_TEXT,

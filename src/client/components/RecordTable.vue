@@ -106,7 +106,7 @@ const subtitle = computed(() =>
                 </small>
               </td>
               <td class="record-status" data-label="状态">
-                <StatusBadge :status="record.status" :verdict="record.verdict" />
+                <StatusBadge :status="record.status" :verdict="record.verdict" :test-mode="record.testMode" />
                 <small class="cell-sub">
                   {{ record.progress.stage === 'analyzing' ? '指纹分析中' : `${record.progress.completed}/${record.progress.total} 项完成` }}
                   <template v-if="record.fingerprintSummary">

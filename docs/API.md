@@ -95,6 +95,19 @@ GET /api/v1/tests/:id
 
 A 404/400-style body is returned for unknown ids.
 
+## Drawing preview
+
+`GET /api/v1/tests/:id/preview` returns `text/html; charset=utf-8` for a completed `pelican` record containing a complete HTML document or fenced HTML fragment, capped at 512 KiB. It preserves the extracted HTML, styles and scripts. Script-created SVG is supported. Records and their original answers are never rewritten.
+
+- `404 NOT_FOUND`: malformed/missing ID or a different test mode.
+- `409 PREVIEW_NOT_READY`: queued, running or failed drawing request.
+- `422 PREVIEW_UNAVAILABLE`: missing/incomplete/oversized HTML, or a standalone SVG (use the sanitized image preview).
+- Same per-IP rate limit as detail queries; available through the record ID even when the public index is disabled.
+- `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Frame-Options: SAMEORIGIN`.
+- Dedicated CSP uses `sandbox allow-scripts`, allows inline scripts/styles and data images/fonts, blocks resource/API connections, workers, nested frames and forms, and limits framing to the app origin. The main app's CSP is not relaxed.
+
+The client also uses `iframe sandbox="allow-scripts"` without `allow-same-origin`, only while a completed detail is open. Successful drawing requests return `verdict: unknown` regardless of artifact validity; `verdictReason` explains preview availability. These are human review results, not automatic visual grades. Legacy drawing records and verdicts remain stored as originally recorded.
+
 ## SSE stream
 
 ```http
