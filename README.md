@@ -41,6 +41,7 @@ RelayCheck 帮助你检查 AI 中转的回答表现与模型路由是否符合�
 | **动画与人工对照** | 按 Cockpit Tools 的题目和交付指令生成动画，HTML 与独立 SVG 均在沙箱中运行；支持停止、重播及源码查看。 |
 | **隐私与访问防护** | Key 和中转地址脱敏存储，提供 SSRF 校验、限流、并发控制及隔离渲染。 |
 | **轻量自托管** | Vue 3 + TypeScript + Fastify + SQLite，支持 Docker Compose / Caddy，适配桌面和手机。 |
+| **演示地址** | (https://aloneapi.top/zhishang/?) |
 
 ## 快速开始
 
